@@ -286,7 +286,7 @@ one starts.
 
 | Phase | Scope | Done when |
 | --- | --- | --- |
-| **0** | `core/`: event types, reducer, stint fold, property tests | Invariant holds under random logs |
+| **0** ✅ | `core/`: event types, reducer, stint fold, property tests | Invariant holds under random logs — [built](./core/) |
 | **1** | Single game: timer, roster, subs, live playing time. Local only. | **You run one real game on it** |
 | **2** | Goals/assists/events, teams & seasons, Supabase sync | A season's data persists |
 | **3** | Fairness deficits, then the shift planner | Suggestions are good enough to accept |
