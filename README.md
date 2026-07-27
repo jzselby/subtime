@@ -65,12 +65,18 @@ npm test                                  # engine: unit + property tests
 npm run build --workspace app             # then, in another shell:
 npx vite preview --port 4173 --workspace app
 node scripts/smoke.mjs                    # drives a whole game in a real browser
+node scripts/resume.mjs                   # leaves mid-game and comes back
 ```
 
 `scripts/smoke.mjs` plays a full two-half game through the actual UI — roster,
 lineup, kickoff, subs, goals, a stoppage, undo, full time — and checks the
 numbers the app reports, including the field-time invariant end to end. It writes
-screenshots to `scripts/shots/`. Pass `--headed` to watch it.
+screenshots to `scripts/shots/`. Pass `--headed` to watch either script.
+
+`scripts/resume.mjs` covers the failure mode that matters most on a sideline:
+it starts a game, closes the tab entirely, waits, and reopens. Game time must
+have kept accruing across the gap — it is derived from timestamps, not ticked —
+and the app must land back on the live screen, still substitutable.
 
 The engine's own guarantee is documented in [`core/README.md`](./core/README.md):
 `Σ player minutes == ∫ onFieldCount dt`, verified two independent ways over
