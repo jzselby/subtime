@@ -59,6 +59,12 @@ export class LogBuilder {
     return this.push({ type: 'PERIOD_END' });
   }
 
+  /** Finish the game right now, regardless of remaining configured periods. */
+  gameEnd(atMs?: number): this {
+    if (atMs !== undefined) this.clockMs = atMs;
+    return this.push({ type: 'GAME_END' });
+  }
+
   pause(atMs: number): this {
     this.clockMs = atMs;
     return this.push({ type: 'CLOCK_PAUSE' });

@@ -126,6 +126,13 @@ what makes rows collide.) The formation is captioned top-left.
   given to the wrong player, a card on the wrong name, a substitution that never
   happened. Every number re-derives from the corrected log, so fixing it there
   fixes the minutes, the stats and the timeline at once.
+- **Hold to end the game** (in the same menu, live and on the stats screen)
+  finishes the game right now, whatever period it's on — the other way to reach
+  full time besides holding ■ through the last configured period. It's what a
+  weather stoppage, an injury pile-up, or a tournament game cut short calls for:
+  no waiting through periods that were never going to be played. It's an event
+  like any other, so deleting it from Modify events un-finishes the game — the
+  same recovery an accidental "End half" already gets.
 - **Delete game** is in the same menu, and in ••• on the stats screen.
 
 ### Removing a player
@@ -151,6 +158,14 @@ and a full event log · per-game report with playing-time bars, a who-was-on-whe
 timeline, plus/minus and **minutes in each position by name** · copy-to-clipboard
 summary · **CSV by download, share sheet or email** · installable, offline,
 survives a reload mid-game.
+
+The CSV opens as a small report, not a data dump: a few lines naming the team,
+opponent, date, final score and fairness, then one clean row per player —
+minutes, positions played, goals, assists, +/-. Cells are quoted only where the
+syntax actually needs it, so the raw file reads as text and not as a wall of
+`"..."`. Sharing or emailing it always hands over the real file — mailto can't
+attach one, so Email saves it and puts the readable summary in the draft
+instead of pasting the CSV into the body.
 
 ### Formations
 
@@ -193,6 +208,7 @@ node scripts/clock.mjs                    # the clock across a period boundary
 node scripts/export.mjs                   # download, share and email a CSV
 node scripts/sheets.mjs                   # nothing covers a sheet's buttons
 node scripts/roster.mjs                   # removing a player keeps the record
+node scripts/endgame.mjs                  # ending a game early, and un-ending it
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
@@ -223,10 +239,12 @@ clock restarts, the period label follows, and the whole-game total is the sum of
 what was played.
 
 `scripts/export.mjs` takes the CSV out all three ways. The download is checked end
-to end — the file lands, and its header, row count and goal column are parsed
-back. Share and email hand off to the OS, so those are caught at the boundary:
-`navigator.share` is stubbed and its file and text inspected, and the `mailto:`
-navigation is intercepted and its subject and body read.
+to end — the file lands, and its metadata block, header and goal column are
+parsed back. Share and email hand off to the OS, so those are caught at the
+boundary: `navigator.share` is stubbed and its file and text inspected, and the
+`mailto:` navigation is intercepted and its subject and body read — including
+that Email actually saves the CSV rather than only inlining it, and that
+neither route ever dumps the raw CSV into a message body.
 
 `scripts/sheets.mjs` guards a bug that only appeared on iOS. The header and the
 footer action bar are blurred, WebKit promotes a blurred element to its own
@@ -243,6 +261,13 @@ reads their name back off the summary and the exported CSV; it deletes one who
 never played; it refuses to remove one who is on the pitch mid-match; and it
 checks a player named `=1+1` is defused on export while a negative plus/minus
 stays a number.
+
+`scripts/endgame.mjs` covers ending a game early. From mid-first-half it checks
+that a quick tap on "Hold to end the game" does nothing, that holding it does,
+that the log records `GAME_END` rather than a second period ever starting, that
+the option disappears once the game is final, and that deleting the event from
+Modify events un-finishes the game — the same recovery a mis-tapped period end
+already gets, since it's an event in the log like any other.
 
 `scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
 asserts the page does not scroll, the whole pitch is on screen, and **no two

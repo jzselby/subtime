@@ -609,6 +609,27 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 Hold to end {periodLabel} (or ■ in the bar)
               </HoldButton>
             )}
+            {/*
+             * PERIOD_END on the last configured period already finishes a game
+             * played to schedule — that's the ■ button above. This is the other
+             * case: weather, an injury pile-up, a tournament that cuts a game
+             * short. Waiting for period N to end was not an option, and the
+             * only way to get there was to hold ■ through periods you never
+             * meant to play.
+             */}
+            {canPlay && (
+              <HoldButton
+                className="btn danger block"
+                onHold={() => {
+                  setSheet(null);
+                  void record({ type: 'GAME_END' }).then(() =>
+                    navigate({ name: 'summary', gameId }),
+                  );
+                }}
+              >
+                Hold to end the game
+              </HoldButton>
+            )}
             <button
               className="btn block"
               onClick={() => {

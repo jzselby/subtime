@@ -115,13 +115,19 @@ const [dl] = await Promise.all([
   page.click('.sheet >> text=Download CSV'),
 ]);
 const csv = (await readFile(await dl.path())).toString();
-check('a formula name is defused', csv.includes(`"'=1+1"`), true);
-check('and is not left live', /(^|,)"=1\+1"/.test(csv), false);
-// plus_minus is the seventh column and is legitimately negative here.
-const minus = csv.trim().split('\n').slice(1).map((r) => r.split(',')[6]);
-check('a negative plus/minus stays a number', minus.some((v) => v === '"-1"'), true);
-check('no negative number was quoted as text', minus.some((v) => v?.includes("'")), false);
-check('every player is in the file', csv.trim().split('\n').length, 7);
+// A metadata block identifies the game, then a blank line, then the table —
+// cells are unquoted unless the syntax actually requires it, so the checks
+// below look for the plain, un-quoted forms rather than `"..."`.
+const lines = csv.replace(/\r\n/g, '\n').trim().split('\n');
+const [header, ...rows] = lines.slice(lines.indexOf('') + 1);
+check('a formula name is defused', csv.includes("'=1+1"), true);
+check('and is not left live', /(^|,)=1\+1(,|$)/m.test(csv), false);
+// Plus/Minus is the eighth column and is legitimately negative here.
+const minusCol = header.split(',').indexOf('Plus/Minus');
+const minus = rows.map((r) => r.split(',')[minusCol]);
+check('a negative plus/minus stays a number', minus.some((v) => v === '-1'), true);
+check('no negative number was quoted or prefixed as text', minus.some((v) => v?.includes("'")), false);
+check('every present player is in the file', rows.length, 6);
 
 // -- someone on the pitch right now is not removable -----------------------
 await page.goto(URL);
@@ -178,7 +184,11 @@ const [dl2] = await Promise.all([
 ]);
 const csv2 = (await readFile(await dl2.path())).toString();
 check('the CSV still names them', csv2.includes('Alice Adams'), true);
-check('their goal is still theirs', /"Alice Adams",[^\n]*,"1",/.test(csv2), true);
+const lines2 = csv2.replace(/\r\n/g, '\n').trim().split('\n');
+const [header2, ...rows2] = lines2.slice(lines2.indexOf('') + 1);
+const goalsCol2 = header2.split(',').indexOf('Goals');
+const aliceRow = rows2.find((r) => r.startsWith('Alice Adams,'));
+check('their goal is still theirs', aliceRow?.split(',')[goalsCol2], '1');
 
 // -- a retired player is off future team sheets ----------------------------
 await page.goto(URL);

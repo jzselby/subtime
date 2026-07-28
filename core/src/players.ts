@@ -24,6 +24,7 @@ export function playerIdsIn(e: GameEvent): PlayerId[] {
       return [e.scorerId, e.assistId ?? null].filter((id): id is PlayerId => id !== null);
     case 'PERIOD_START':
     case 'PERIOD_END':
+    case 'GAME_END':
     case 'CLOCK_PAUSE':
     case 'CLOCK_RESUME':
     case 'OPPONENT_GOAL':

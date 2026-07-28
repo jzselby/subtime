@@ -71,6 +71,7 @@ export type EventType =
   | 'SET_LINEUP'
   | 'PERIOD_START'
   | 'PERIOD_END'
+  | 'GAME_END'
   | 'CLOCK_PAUSE'
   | 'CLOCK_RESUME'
   | 'SUB'
@@ -108,6 +109,14 @@ export type GameEvent = EventMeta &
     | { type: 'SET_LINEUP'; slots: PlayerSlot[] }
     | { type: 'PERIOD_START' }
     | { type: 'PERIOD_END' }
+    /**
+     * Finishes the game right now, regardless of how many configured periods
+     * have actually been played. `PERIOD_END` on the last period already
+     * finalises a game played to schedule; this is for the other case — called
+     * early for weather, an injury pile-up, or a tournament that cuts a game
+     * short — where waiting for period N to end is not the coach's intent.
+     */
+    | { type: 'GAME_END' }
     | { type: 'CLOCK_PAUSE'; reason?: string }
     | { type: 'CLOCK_RESUME' }
     /** Incremental change. `off` and `on` need not be the same length. */

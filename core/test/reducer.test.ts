@@ -191,6 +191,89 @@ describe('short-handed play', () => {
   });
 });
 
+describe('game end', () => {
+  it('finishes the game mid-period, closing stints at the clock it fires', () => {
+    const b = new LogBuilder(cfg)
+      .attendance([...five, ...bench])
+      .lineup(startingSlots)
+      .startPeriod(1)
+      .sub(5 * MIN, ['a'], [{ playerId: 'f', position: 'GK' }])
+      .gameEnd(12 * MIN);
+
+    const { state, errors } = reduce(b.events, cfg);
+    expect(errors).toEqual([]);
+    expect(state.status).toBe('final');
+    // Called early: only one of the two configured periods was ever played.
+    expect(state.period).toBe(1);
+    for (const stint of state.stints) expect(stint.endMs).not.toBeNull();
+
+    const stats = new Map(playerStats(state, 0).map((s) => [s.playerId, s]));
+    expect(stats.get('a')?.playedMs).toBe(5 * MIN);
+    expect(stats.get('f')?.playedMs).toBe(7 * MIN);
+    expect(stats.get('b')?.playedMs).toBe(12 * MIN);
+  });
+
+  it('finishes the game while paused, at the clock position it paused on', () => {
+    const b = new LogBuilder(cfg)
+      .attendance(five)
+      .lineup(startingSlots)
+      .startPeriod(1)
+      .pause(8 * MIN)
+      .gameEnd();
+
+    const { state, errors } = reduce(b.events, cfg);
+    expect(errors).toEqual([]);
+    expect(state.status).toBe('final');
+    expect(state.clockMs).toBe(8 * MIN);
+    expect(totalPlayedMs(state, 0)).toBe(5 * 8 * MIN);
+  });
+
+  it('finishes the game from a break, between periods, with nothing further to close', () => {
+    const b = new LogBuilder(cfg)
+      .attendance(five)
+      .lineup(startingSlots)
+      .startPeriod(1)
+      .endPeriod(20 * MIN)
+      .gameEnd();
+
+    const { state, errors } = reduce(b.events, cfg);
+    expect(errors).toEqual([]);
+    expect(state.status).toBe('final');
+    // The second half never happened — only the first period counts.
+    expect(totalPlayedMs(state, 0)).toBe(5 * 20 * MIN);
+  });
+
+  it('finishes a game that never kicked off', () => {
+    const b = new LogBuilder(cfg).attendance(five).lineup(startingSlots).gameEnd();
+    const { state, errors } = reduce(b.events, cfg);
+    expect(errors).toEqual([]);
+    expect(state.status).toBe('final');
+    expect(totalPlayedMs(state, 0)).toBe(0);
+  });
+
+  it('is idempotent: a second GAME_END is refused, not double-applied', () => {
+    const b = new LogBuilder(cfg).attendance(five).lineup(startingSlots).startPeriod(1).gameEnd(9 * MIN);
+    b.gameEnd(9 * MIN);
+    const { state, errors } = reduce(b.events, cfg);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.reason).toMatch(/already final/);
+    expect(state.status).toBe('final');
+  });
+
+  it('refuses events after the game has ended, same as after the last PERIOD_END', () => {
+    const b = new LogBuilder(cfg)
+      .attendance([...five, ...bench])
+      .lineup(startingSlots)
+      .startPeriod(1)
+      .gameEnd(9 * MIN);
+    b.sub(9 * MIN, ['a'], [{ playerId: 'f', position: 'GK' }]);
+    const { errors, state } = reduce(b.events, cfg);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.reason).toMatch(/already final/);
+    expect(state.onField.has('a')).toBe(true);
+  });
+});
+
 describe('validation', () => {
   const base = () =>
     new LogBuilder(cfg).attendance([...five, ...bench]).lineup(startingSlots).startPeriod(1);

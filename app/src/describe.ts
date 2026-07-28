@@ -11,6 +11,8 @@ export function describeEvent(
       return `Period ${e.period} started`;
     case 'PERIOD_END':
       return `Period ${e.period} ended`;
+    case 'GAME_END':
+      return 'Game ended';
     case 'CLOCK_PAUSE':
       return 'Clock stopped';
     case 'CLOCK_RESUME':

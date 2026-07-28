@@ -1,7 +1,7 @@
 import { elapsedGameMs, fairnessIndex, formatClock, playerStats } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
-import { mins, mmss, Screen, Sheet } from '../components';
+import { HoldButton, mins, mmss, Screen, Sheet } from '../components';
 import { db, deleteGame } from '../db';
 import { useGameLog, useNow } from '../hooks';
 import { navigate } from '../router';
@@ -16,19 +16,28 @@ const DEFAULT_CFG = {
 const NUMERIC = /^-?\d+(\.\d+)?$/;
 
 /**
- * One CSV cell: quoted for delimiter safety, and defused for the spreadsheet.
+ * One CSV cell: quoted only where the syntax requires it, and defused for the
+ * spreadsheet where the content requires that.
  *
  * Excel and Sheets evaluate an imported cell that opens with `=`, `+`, `-` or
  * `@` as a formula, so a player entered as `=1+1` — or anything less innocent —
- * runs on import. A leading apostrophe forces it to text.
+ * runs on import. A leading apostrophe forces it to text; Excel's own import
+ * logic already treats that as a formatting hint, quoted or not.
  *
- * The exception is what makes this safe to apply everywhere: a value that is
- * simply a number is left alone. `plus_minus` is legitimately negative, and
- * quoting `-2` as text would break the first SUM the head coach writes.
+ * Quoting *every* cell — the previous behaviour — produced a file that was
+ * technically valid and unreadable as plain text: `"Ana","24","0","GK 24m"`
+ * for a row with nothing in it that needed escaping. A cell is quoted here
+ * only when it contains a comma, a quote, or a newline, which is what makes
+ * the raw file scannable in a text preview and not just once it's imported.
+ *
+ * The formula guard is exempted from that: a value that is simply a number is
+ * left alone regardless. `+/-` is legitimately negative, and quoting `-2` as
+ * text would break the first SUM the head coach writes.
  */
 export function csvCell(value: unknown): string {
   const raw = String(value);
   const safe = /^[=+\-@\t\r]/.test(raw) && !NUMERIC.test(raw) ? `'${raw}` : raw;
+  if (!/[",\n\r]/.test(safe)) return safe;
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
@@ -44,7 +53,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   );
 
   const config = game?.config ?? DEFAULT_CFG;
-  const { state, errors } = useGameLog(gameId, config);
+  const { state, errors, record } = useGameLog(gameId, config);
   const now = useNow(state.status === 'running');
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -111,42 +120,83 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
     }
   };
 
+  const numberOf = (id: string) => players?.find((p) => p.id === id)?.number ?? '';
+
+  /** "CM 12m · LB 8m" for a CSV cell — whole minutes, matches the rest of the file. */
+  const positionsForCsv = (msByPosition: Record<string, number>): string =>
+    Object.entries(msByPosition)
+      .sort((a, b) => b[1] - a[1])
+      .map(([code, ms]) => `${code} ${mins(ms)}m`)
+      .join(' · ');
+
+  const csvRow = (cells: unknown[]): string => cells.map(csvCell).join(',');
+
+  /*
+   * A short metadata block above the table, not a bare data dump: opened cold
+   * — forwarded by text, detached from the filename that named the game — the
+   * file itself should say which game this is.
+   */
   const csvText = () => {
-    const header = [
-      'player', 'minutes', 'bench_minutes', 'positions', 'goals', 'assists',
-      'plus_minus', 'shots', 'saves', 'stints',
+    const lines = [
+      csvRow(['Team', team.name]),
+      csvRow(['Opponent', game.opponent || 'TBD']),
+      csvRow(['Date', new Date(game.kickoffAt).toLocaleDateString()]),
+      csvRow(['Final score', `${team.name} ${state.score.us} – ${game.opponent || 'Opponent'} ${state.score.them}`]),
+      csvRow(['Playing-time fairness', `${Math.round(index * 100)}%`]),
+      '',
+      // Not "+/-": a header starting with + or - is exactly what the formula
+      // guard below has to catch on a data cell, and it doesn't distinguish a
+      // column label from a player's name — it would have prefixed this one
+      // with an apostrophe too.
+      csvRow([
+        'Player', 'Number', 'Minutes', 'Bench Minutes', 'Positions Played',
+        'Goals', 'Assists', 'Plus/Minus', 'Shots', 'Saves', 'Stints',
+      ]),
+      ...byMinutes.map((s) =>
+        csvRow([
+          nameOf(s.playerId),
+          numberOf(s.playerId),
+          mins(s.playedMs),
+          mins(s.benchMs),
+          positionsForCsv(s.msByPosition) || '—',
+          s.goals,
+          s.assists,
+          s.plusMinus,
+          s.shots,
+          s.saves,
+          s.stintCount,
+        ]),
+      ),
     ];
-    const rows = byMinutes.map((s) => [
-      nameOf(s.playerId),
-      (s.playedMs / 60_000).toFixed(1),
-      (s.benchMs / 60_000).toFixed(1),
-      Object.entries(s.msByPosition)
-        .map(([pos, ms]) => `${pos}:${(ms / 60_000).toFixed(0)}`)
-        .join(' '),
-      s.goals, s.assists, s.plusMinus, s.shots, s.saves, s.stintCount,
-    ]);
-    return [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\n');
+    // CRLF: the RFC 4180 line ending, and what Excel on Windows expects.
+    return lines.join('\r\n');
   };
 
   const csvName = () =>
     `${team.name}-vs-${game.opponent || 'game'}-${new Date(game.kickoffAt).toISOString().slice(0, 10)}.csv`
       .replace(/[^\w.-]+/g, '-');
 
-  const downloadCsv = () => {
+  /** The file itself, with no side effect on the sheet — shared by every route below. */
+  const saveCsv = () => {
     const url = URL.createObjectURL(new Blob([csvText()], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = csvName();
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadCsv = () => {
+    saveCsv();
     setShare(false);
   };
 
   /*
    * On a phone the share sheet is the only route to Messages, Mail, AirDrop and
    * Files, and it is the only one that can carry the CSV as a real attachment.
-   * Not every browser will take a file, so this degrades: file + text, then text
-   * alone, then the clipboard.
+   * Where the platform can't take a file, the CSV is saved to downloads instead
+   * of pasted into the message as raw text — a wall of quoted, comma-separated
+   * cells is not something anyone wants to read in a text thread.
    */
   const shareCsv = async () => {
     const text = summaryText();
@@ -156,10 +206,12 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title, text, files: [file] });
       } else if (navigator.share) {
-        await navigator.share({ title, text: `${text}\n\n${csvText()}` });
+        saveCsv();
+        await navigator.share({ title, text: `${text}\n\n(Full stats CSV saved to your downloads.)` });
       } else {
-        await navigator.clipboard.writeText(`${text}\n\n${csvText()}`);
-        alert('Sharing is not available in this browser — the stats were copied instead.');
+        saveCsv();
+        await navigator.clipboard.writeText(text);
+        alert('Sharing is not available in this browser — the summary was copied, and the CSV was saved to your downloads.');
       }
       setShare(false);
     } catch (err) {
@@ -169,18 +221,16 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   };
 
   /*
-   * mailto cannot attach a file, so the CSV goes inline in the body where it
-   * still pastes straight into a spreadsheet. Long rosters can outrun the URL
-   * limit some clients impose, so past a safe size the body carries the readable
-   * summary and the CSV is downloaded alongside it.
+   * mailto cannot attach a file — there is no header for it, on any platform —
+   * so the CSV is saved to downloads and the body carries only the readable
+   * summary. Earlier this inlined the raw CSV into the body below a length
+   * threshold, which for a normal-sized roster was under the threshold every
+   * time: every email got a wall of quoted cells instead of a draft.
    */
   const emailCsv = () => {
-    const csv = csvText();
-    const full = `${summaryText()}\n\nCSV\n${csv}`;
-    const tooLong = encodeURIComponent(full).length > 1800;
-    if (tooLong) downloadCsv();
+    saveCsv();
     const subject = `${team.name} ${state.score.us}–${state.score.them} ${game.opponent || 'Opponent'} — stats`;
-    const body = tooLong ? `${summaryText()}\n\n(Full CSV attached from your downloads.)` : full;
+    const body = `${summaryText()}\n\n(The full stats CSV was just saved to your downloads — attach it before sending.)`;
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setShare(false);
   };
@@ -235,7 +285,8 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
             <button className="btn block stack" onClick={emailCsv}>
               Email
               <span className="small muted" style={{ display: 'block' }}>
-                Opens a draft with the summary and the CSV in the body.
+                Saves the CSV, then opens a draft with the summary — attach the
+                file before sending.
               </span>
             </button>
           </div>
@@ -245,6 +296,17 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
       {menu && (
         <Sheet title={`vs ${game.opponent || 'TBD'}`} onClose={() => setMenu(false)}>
           <div style={{ display: 'grid', gap: 8 }}>
+            {state.status !== 'final' && (
+              <HoldButton
+                className="btn danger block"
+                onHold={() => {
+                  setMenu(false);
+                  void record({ type: 'GAME_END' });
+                }}
+              >
+                Hold to end the game
+              </HoldButton>
+            )}
             <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
               Modify events
             </button>

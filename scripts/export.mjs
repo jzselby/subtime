@@ -107,14 +107,21 @@ const [download] = await Promise.all([
   page.click('.sheet >> text=Download CSV'),
 ]);
 const csv = (await (await import('node:fs/promises')).readFile(await download.path())).toString();
-const rows = csv.trim().split('\n');
+// CRLF line endings (RFC 4180); a metadata block identifies the game, then a
+// blank line, then the header and one row per present player.
+const lines = csv.replace(/\r\n/g, '\n').trim().split('\n');
+const blank = lines.indexOf('');
+const meta = lines.slice(0, blank);
+const [header, ...rows] = lines.slice(blank + 1);
+
 check('filename is safe for a filesystem', /^[\w.-]+\.csv$/.test(download.suggestedFilename()), true);
 check('names the teams and the date', /Export-FC-vs-Rivals-\d{4}-\d{2}-\d{2}\.csv/.test(download.suggestedFilename()), true);
-check('header names the columns', rows[0].startsWith('"player","minutes"'), true);
-check('one row per present player', rows.length, 7);
-// Goals is the fifth column; exactly one player should own the one goal.
-const goalsColumn = rows.slice(1).map((r) => r.split(',')[4]);
-check('the goal lands on exactly one player', goalsColumn.filter((g) => g === '"1"').length, 1);
+check('the file identifies the game without the filename', meta.some((l) => l.startsWith('Opponent,Rivals')), true);
+check('header names the columns, unquoted', header, 'Player,Number,Minutes,Bench Minutes,Positions Played,Goals,Assists,Plus/Minus,Shots,Saves,Stints');
+check('one row per present player', rows.length, 6);
+// Goals is the sixth column; exactly one player should own the one goal.
+const goalsColumn = rows.map((r) => r.split(',')[5]);
+check('the goal lands on exactly one player', goalsColumn.filter((g) => g === '1').length, 1);
 check('sheet closes after downloading', await page.locator('text=Export stats').count(), 0);
 
 // -- share -----------------------------------------------------------------
@@ -132,21 +139,32 @@ check('share is titled with the fixture', shared?.title?.includes('vs Rivals'), 
 await page.click('.actions >> text=Export CSV');
 await page.waitForSelector('text=Export stats');
 /*
- * A mailto navigation would take the page away from the app, so it is caught at
- * the route level and the URL inspected instead of followed.
+ * mailto cannot attach a file on any platform, so Email now saves the CSV to
+ * downloads first and puts only the readable summary in the body — the raw
+ * CSV used to be inlined below a length threshold that a normal-sized roster
+ * was always under, so every email got a wall of quoted, comma-separated
+ * cells instead of a draft a human would want to read.
+ *
+ * The mailto navigation would take the page away from the app, so it is
+ * caught at the route level and the URL inspected instead of followed.
  */
 await page.route('mailto:**', (r) => r.abort());
-const mailto = await new Promise(async (resolve) => {
-  page.once('request', (r) => r.url().startsWith('mailto:') && resolve(r.url()));
-  page.on('framenavigated', (f) => f.url().startsWith('mailto:') && resolve(f.url()));
-  await page.click('.sheet >> text=Email');
-  setTimeout(() => resolve(''), 2500);
-});
+const [emailDownload, mailto] = await Promise.all([
+  page.waitForEvent('download'),
+  new Promise(async (resolve) => {
+    page.once('request', (r) => r.url().startsWith('mailto:') && resolve(r.url()));
+    page.on('framenavigated', (f) => f.url().startsWith('mailto:') && resolve(f.url()));
+    await page.click('.sheet >> text=Email');
+    setTimeout(() => resolve(''), 2500);
+  }),
+]);
 const decoded = decodeURIComponent(mailto);
+check('email saves the CSV rather than only inlining it', emailDownload.suggestedFilename(), download.suggestedFilename());
 check('email opens a draft', mailto.startsWith('mailto:?subject='), true);
 check('subject carries the score line', /Export FC \d+–\d+ Rivals — stats/.test(decoded), true);
 check('body carries the summary', decoded.includes('Playing time:'), true);
-check('body carries the CSV for a small roster', decoded.includes('"player","minutes"'), true);
+check('body does not dump the raw CSV', decoded.includes('Player,Number,Minutes'), false);
+check('body says the file was saved', decoded.includes('saved to your downloads'), true);
 
 await browser.close();
 const failed = checks.filter((c) => !c).length;

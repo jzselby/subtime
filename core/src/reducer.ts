@@ -23,6 +23,10 @@ import type {
  *                       break ──PERIOD_START──▶ running     (more periods left)
  *                       final                               (last period ended)
  *
+ * GAME_END is the other way into `final`: from any of pregame, running,
+ * paused or break, called by the coach rather than derived from the period
+ * count — a game stopped early is still a finished game.
+ *
  * Substitutions are legal in every state. Subbing while stopped changes the
  * on-field set without accruing any time, which is exactly what you want for
  * setting the starting XI and for halftime changes.
@@ -231,6 +235,21 @@ function applyEvent(s: GameStateShape, e: GameEvent): string | null {
       s.clockMs = endAt;
       s.anchor = null;
       s.status = s.period >= s.config.periods.count ? 'final' : 'break';
+      break;
+    }
+
+    case 'GAME_END': {
+      // Mirrors PERIOD_END's clock-closing when a period is actually live;
+      // between periods (break) or before the first (pregame) there is
+      // nothing open to close — PERIOD_END already did that on the way in.
+      if (s.status === 'running' || s.status === 'paused') {
+        const endAt = s.status === 'running' ? e.gameClockMs : s.clockMs;
+        closeAllStints(s, endAt);
+        s.periodElapsedMs[s.period - 1] = endAt;
+        s.clockMs = endAt;
+      }
+      s.anchor = null;
+      s.status = 'final';
       break;
     }
 
