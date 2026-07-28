@@ -68,6 +68,30 @@ await page.waitForSelector('.pitch');
 await page.waitForSelector("text=Who's here?");
 await page.click('.sheet >> text=Done');
 await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
+// -- 0. dragging works during setup too ----------------------------------
+// Put one player on, then move them to a different position without ever
+// sending them back to the bench.
+await page.click('.token >> nth=1');
+await page.click('.sheet .chip:not([disabled]) >> nth=0');
+await page.waitForTimeout(150);
+const setupName = (await page.locator('.token:not(.vacant) .tname').innerText()).trim();
+await dragTo(
+  await page.locator('.token:not(.vacant)').boundingBox(),
+  await page.locator('.token.vacant >> nth=3').boundingBox(),
+);
+check('setup: a player can be dragged between positions', await page.locator('.token:not(.vacant)').count(), 1);
+check(
+  'setup: it is still the same player',
+  (await page.locator('.token:not(.vacant) .tname').innerText()).trim(),
+  setupName,
+);
+// And back to the bench.
+await dragTo(
+  await page.locator('.token:not(.vacant)').boundingBox(),
+  await page.locator('.benchstrip').boundingBox(),
+);
+check('setup: dragging to the bench unassigns', await page.locator('.token:not(.vacant)').count(), 0);
+
 await page.click('text=Fill rest');
 await page.waitForTimeout(200);
 await page.click('text=Start game');

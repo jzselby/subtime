@@ -7,6 +7,8 @@ import { useGameLog } from '../hooks';
 import type { Occupant } from '../Pitch';
 import { Pitch } from '../Pitch';
 import { navigate } from '../router';
+import type { DropTarget } from '../usePitchDrag';
+import { usePitchDrag } from '../usePitchDrag';
 
 export function SetupScreen({ gameId }: { gameId: string }) {
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
@@ -67,6 +69,35 @@ export function SetupScreen({ gameId }: { gameId: string }) {
     }
   }, [roster.length, attendanceKnown]);
 
+  /*
+   * Setup drags the same way the game does — the lineup here is plain state
+   * rather than events, but the gesture must not differ. Onto an empty position
+   * moves; onto an occupied one swaps; onto the bench unassigns.
+   */
+  const onDrop = (from: 'bench' | string, playerId: string, target: DropTarget) => {
+    setLineup((prev) => {
+      const next = { ...prev };
+      if (target.onBench) {
+        if (from !== 'bench') delete next[from];
+        return next;
+      }
+      if (!target.slotId) return prev;
+      const sitting = next[target.slotId];
+      if (from === 'bench') {
+        // Whoever was there goes back to the bench.
+        next[target.slotId] = playerId;
+        return next;
+      }
+      if (target.slotId === from) return prev;
+      if (sitting) next[from] = sitting;
+      else delete next[from];
+      next[target.slotId] = playerId;
+      return next;
+    });
+  };
+
+  const { startDrag, ghost, dropSlotId, dragged } = usePitchDrag(onDrop);
+
   if (!game) return <Screen title="Loading…">{null}</Screen>;
 
   const formation = game.formation;
@@ -81,6 +112,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
     const p = byId.get(playerId);
     if (p) occupants.set(slotId, { playerId, name: p.name, number: p.number, playedMs: 0 });
   }
+
 
   /** Fill every empty slot with the highest-numbered unassigned players. */
   const autoFill = () => {
@@ -136,7 +168,15 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         <Pitch
           formation={formation}
           occupants={occupants}
-          onSlotTap={(slot) => setPicking(slot.id)}
+          dropSlotId={dropSlotId}
+          onSlotTap={(slot) => {
+            if (dragged.current) return;
+            setPicking(slot.id);
+          }}
+          onTokenPointerDown={(slot, occupant, e) =>
+            occupant &&
+            startDrag(occupant.playerId, slot.id, occupant.number || occupant.name.slice(0, 2))(e)
+          }
         />
       </div>
 
@@ -146,19 +186,29 @@ export function SetupScreen({ gameId }: { gameId: string }) {
           {present.length} of {roster.length} here ›
         </button>
       </div>
-      <div className="benchstrip">
+      <div className="benchstrip" data-bench>
         {present
           .filter((p) => !assigned.has(p.id))
           .map((p) => (
-            <div key={p.id} className="bplayer">
+            <button
+              key={p.id}
+              className="bplayer"
+              onPointerDown={startDrag(p.id, 'bench', p.number || p.name.slice(0, 2))}
+            >
               <span className="shirt">{p.number || p.name.slice(0, 2)}</span>
               <span className="tname">{p.name}</span>
-            </div>
+            </button>
           ))}
         {present.length === filled && (
           <p className="small muted">Everyone available is in the lineup.</p>
         )}
       </div>
+
+      {ghost && (
+        <div className="dragavatar" style={{ left: ghost.x, top: ghost.y }}>
+          {ghost.label}
+        </div>
+      )}
 
       {attendance && (
         <AttendanceSheet
