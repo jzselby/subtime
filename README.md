@@ -26,14 +26,20 @@ you no home-screen icon and no offline.
 
 `.github/workflows/deploy.yml` builds and publishes on every push.
 
-1. In the repo: **Settings → Pages → Source: GitHub Actions**.
-2. Push. The workflow runs tests, builds, and deploys.
+**Step 1 is manual and unavoidable.** Go to **Settings → Pages → Build and
+deployment → Source: GitHub Actions**. Until that is set, every run fails at
+`configure-pages` with *"Get Pages site failed … Not Found"*. The workflow
+cannot do it for you: creating a Pages site needs repo admin, and the
+`GITHUB_TOKEN` a workflow runs with only ever gets write. `pages: write` is
+enough to deploy to a site that exists, not to bring one into being.
+
+Then:
+
+2. Push, or re-run the workflow from the Actions tab.
 3. Open `https://<you>.github.io/subtime/` on your phone **in Safari**.
 4. **Share → Add to Home Screen.**
 
-One caveat: Pages on a *private* repo needs a paid GitHub plan. If this repo is
-private and you're on the free tier, either make it public or use the option
-below.
+Pages on a *private* repo also needs a paid GitHub plan.
 
 ### Netlify Drop (no account, 30 seconds)
 

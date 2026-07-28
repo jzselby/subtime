@@ -30,13 +30,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      # enablement turns Pages on via the API if it has never been configured,
-      # which it needs `pages: write` for. Without it the first run of this
-      # workflow fails with "Get Pages site failed … Not Found" until someone
-      # flips the switch by hand in Settings.
+      # Turning Pages on for the first time is a one-time manual step:
+      # Settings → Pages → Source: GitHub Actions. It cannot be automated here.
+      # `enablement: true` looks like it would do it, but creating a Pages site
+      # needs repo admin and GITHUB_TOKEN tops out at write, so it fails with
+      # "Resource not accessible by integration". `pages: write` below is enough
+      # to *deploy* to a site that already exists, which is all this needs.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
