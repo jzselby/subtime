@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
+import { InstallBanner, UpdateChip } from './components';
 import { requestPersistence } from './db';
+import type { Route } from './router';
 import { useRoute } from './router';
 import { FormationScreen } from './screens/Formation';
 import { HomeScreen } from './screens/Home';
@@ -17,6 +19,21 @@ export function App() {
     void requestPersistence();
   }, []);
 
+  return (
+    <>
+      {screenFor(route)}
+      {/* Both render nothing unless they have something to say, and both sit
+          above the screen rather than inside it so no screen has to know.
+          The banner is pinned to the bottom, which is where Setup, Formation
+          and Summary put their primary action — so it is confined to the home
+          screen, the one place with room for it and the first place you land. */}
+      <UpdateChip />
+      {route.name === 'home' && <InstallBanner />}
+    </>
+  );
+}
+
+function screenFor(route: Route) {
   switch (route.name) {
     case 'team':
       return <TeamScreen key={route.teamId} teamId={route.teamId} />;

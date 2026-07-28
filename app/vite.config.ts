@@ -17,7 +17,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // `prompt`, not `autoUpdate`: a new deploy must not activate and reload
+      // the page on its own, because it could do so mid-game. src/pwa.ts holds
+      // the waiting worker until the coach is not standing on a sideline.
+      registerType: 'prompt',
       includeAssets: ['icons/apple-touch-icon.png'],
       workbox: {
         // The whole app is precached, so a game can be run with no signal at all.

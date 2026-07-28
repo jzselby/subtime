@@ -1158,3 +1158,65 @@ label.field > span {
   font-size: 12px;
   font-weight: 800;
 }
+
+/*
+ * Install hint and update offer.
+ *
+ * Both are overlays rather than part of any screen, so they float above the
+ * layout and clear the home indicator. The install hint is the more important
+ * of the two: iOS never volunteers that installing is possible, and run as a
+ * browser tab the app loses the wake lock, the full-bleed pitch, and storage
+ * that outlives a week of not being opened.
+ */
+.install-banner {
+  position: fixed;
+  left: var(--pad);
+  right: var(--pad);
+  bottom: calc(env(safe-area-inset-bottom) + var(--pad));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 45%);
+}
+
+.install-banner p {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.install-banner b {
+  color: var(--text);
+}
+
+.install-banner .btn {
+  flex: none;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.update-chip {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top) + 8px);
+  z-index: 41;
+  min-height: 40px;
+  padding: 0 16px;
+  background: var(--accent);
+  color: #06251a;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+}

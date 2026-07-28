@@ -8,6 +8,7 @@ import { codesOf } from '../formations';
 import { useGameLog, useNow, useWakeLock } from '../hooks';
 import type { Occupant } from '../Pitch';
 import { Pitch } from '../Pitch';
+import { useSuppressUpdates } from '../pwa';
 import { navigate } from '../router';
 
 const DEFAULT_CFG = {
@@ -41,7 +42,11 @@ export function LiveScreen({ gameId }: { gameId: string }) {
 
   const running = state.status === 'running';
   const now = useNow(running);
-  useWakeLock(running || state.status === 'paused');
+  const inPlay = running || state.status === 'paused';
+  useWakeLock(inPlay);
+  // A half in progress, even a paused one, is never the moment to offer a
+  // reload. The update keeps until the game screen is behind us.
+  useSuppressUpdates(inPlay);
 
   const [view, setView] = useState<'field' | 'list'>('field');
   const [pickedOff, setPickedOff] = useState<Set<string>>(new Set());

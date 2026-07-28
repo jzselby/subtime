@@ -22,24 +22,28 @@ matters** — iOS will not install a web app or run its service worker over plai
 HTTP, so a LAN address like `http://192.168.1.20:5173` loads the page but gives
 you no home-screen icon and no offline.
 
-### GitHub Pages (already wired up)
+### GitHub Pages — live
 
-`.github/workflows/deploy.yml` builds and publishes on every push.
+Pages is enabled and `.github/workflows/deploy.yml` rebuilds and republishes on
+every push. The app is at:
 
-**Step 1 is manual and unavoidable.** Go to **Settings → Pages → Build and
-deployment → Source: GitHub Actions**. Until that is set, every run fails at
-`configure-pages` with *"Get Pages site failed … Not Found"*. The workflow
-cannot do it for you: creating a Pages site needs repo admin, and the
-`GITHUB_TOKEN` a workflow runs with only ever gets write. `pages: write` is
-enough to deploy to a site that exists, not to bring one into being.
+**<https://jzselby.github.io/subtime/>**
 
-Then:
+To install it:
 
-2. Push, or re-run the workflow from the Actions tab.
-3. Open `https://<you>.github.io/subtime/` on your phone **in Safari**.
-4. **Share → Add to Home Screen.**
+1. Open that URL on your phone **in Safari**. It has to be Safari — Chrome and
+   Firefox on iOS cannot add to the home screen.
+2. **Share → Add to Home Screen.**
+3. Launch it from the icon, not from the browser. That is what buys you the
+   full-screen layout, the wake lock, and storage Safari won't evict.
 
-Pages on a *private* repo also needs a paid GitHub plan.
+Enabling Pages in the first place was a one-time manual step (**Settings → Pages
+→ Source: GitHub Actions**) and is already done. It could not be automated:
+creating a Pages site needs repo admin, and the `GITHUB_TOKEN` a workflow runs
+with only ever gets write. `pages: write` is enough to deploy to a site that
+exists, not to bring one into being.
+
+Pages on a *private* repo also needs a paid GitHub plan; this repo is public.
 
 ### Netlify Drop (no account, 30 seconds)
 

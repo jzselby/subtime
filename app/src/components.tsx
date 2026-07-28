@@ -1,6 +1,7 @@
 import { formatClock } from '@subtime/core';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
+import { applyPendingUpdate, useInstallHint, useUpdateReady } from './pwa';
 
 export function Screen({
   title,
@@ -186,6 +187,52 @@ export function PlayerRow({
       </span>
       {right}
     </button>
+  );
+}
+
+/**
+ * Offer a waiting app update. Renders nothing until one is both available and
+ * safe to apply — see pwa.ts, which holds it back while a game is live.
+ */
+export function UpdateChip() {
+  const ready = useUpdateReady();
+  if (!ready) return null;
+  return (
+    <button className="update-chip" onClick={applyPendingUpdate}>
+      Update ready — tap to reload
+    </button>
+  );
+}
+
+/**
+ * Nudge toward installing, because iOS will never do it for us.
+ *
+ * Deliberately dismissible and remembered: a coach who has decided to run it in
+ * a tab should not be asked twice.
+ */
+export function InstallBanner() {
+  const { hint, dismiss } = useInstallHint();
+  if (!hint) return null;
+
+  return (
+    <div className="install-banner" role="status">
+      <p>
+        {hint === 'add-to-home-screen' ? (
+          <>
+            <b>Install it:</b> tap Share, then Add to Home Screen. You get a
+            full-screen pitch, offline play, and a screen that stays awake.
+          </>
+        ) : (
+          <>
+            <b>Open this in Safari</b> to install it. Only Safari can add an app to
+            the iPhone home screen.
+          </>
+        )}
+      </p>
+      <button className="btn ghost" onClick={dismiss} aria-label="Dismiss">
+        Dismiss
+      </button>
+    </div>
   );
 }
 
