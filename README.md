@@ -117,6 +117,18 @@ what makes rows collide.) The formation is captioned top-left.
   fixes the minutes, the stats and the timeline at once.
 - **Delete game** is in the same menu, and in ••• on the stats screen.
 
+### Removing a player
+
+**Remove** on the roster means one of two things, and the confirm says which. A
+player who has never played is deleted outright. A player who *has* played is
+**retired**: off the roster and off future team sheets, still named in every game
+they played, and restorable from the Retired list underneath the roster.
+
+That is not politeness, it is the price of an event log. The log stores player
+*ids*, so deleting the row those ids point at does not remove the player from a
+game already played — it removes their *name*, and the summary, the timeline and
+the exported CSV start attributing goals to a raw UUID with no way back.
+
 ## What works today
 
 Rosters and teams · attendance · **formations from 4v4 to 11v11 with named
@@ -169,6 +181,7 @@ node scripts/edit.mjs                     # correcting a recorded game
 node scripts/clock.mjs                    # the clock across a period boundary
 node scripts/export.mjs                   # download, share and email a CSV
 node scripts/sheets.mjs                   # nothing covers a sheet's buttons
+node scripts/roster.mjs                   # removing a player keeps the record
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
@@ -212,6 +225,13 @@ be tapped. Chromium sorted the same markup correctly, which is why a screenshot
 proved nothing. Sheets now render through a portal into `<body>` and the blurred
 bars stand down while one is open; the test asserts both, and that every button
 in every sheet is the topmost element at its own centre.
+
+`scripts/roster.mjs` covers the rule that removing a player must not rewrite
+history, and the CSV formula guard. It retires a player who has played, then
+reads their name back off the summary and the exported CSV; it deletes one who
+never played; it refuses to remove one who is on the pitch mid-match; and it
+checks a player named `=1+1` is defused on export while a negative plus/minus
+stays a number.
 
 `scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
 asserts the page does not scroll, the whole pitch is on screen, and **no two

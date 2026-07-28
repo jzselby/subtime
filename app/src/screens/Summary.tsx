@@ -12,6 +12,26 @@ const DEFAULT_CFG = {
   gkPosition: 'GK',
 };
 
+/** A plain number, which a spreadsheet should keep as a number. */
+const NUMERIC = /^-?\d+(\.\d+)?$/;
+
+/**
+ * One CSV cell: quoted for delimiter safety, and defused for the spreadsheet.
+ *
+ * Excel and Sheets evaluate an imported cell that opens with `=`, `+`, `-` or
+ * `@` as a formula, so a player entered as `=1+1` — or anything less innocent —
+ * runs on import. A leading apostrophe forces it to text.
+ *
+ * The exception is what makes this safe to apply everywhere: a value that is
+ * simply a number is left alone. `plus_minus` is legitimately negative, and
+ * quoting `-2` as text would break the first SUM the head coach writes.
+ */
+export function csvCell(value: unknown): string {
+  const raw = String(value);
+  const safe = /^[=+\-@\t\r]/.test(raw) && !NUMERIC.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
 export function SummaryScreen({ gameId }: { gameId: string }) {
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
   const team = useLiveQuery(
@@ -105,9 +125,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
         .join(' '),
       s.goals, s.assists, s.plusMinus, s.shots, s.saves, s.stintCount,
     ]);
-    return [header, ...rows]
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
+    return [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\n');
   };
 
   const csvName = () =>

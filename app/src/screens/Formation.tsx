@@ -33,12 +33,17 @@ export function FormationScreen({ teamId, gameId }: { teamId?: string; gameId?: 
     }
   }, [target, draft]);
 
-  const back = () =>
-    navigate(
-      gameId
-        ? { name: 'setup', gameId }
-        : { name: 'team', teamId: teamId as string },
-    );
+  /*
+   * Back goes where the game actually is, not where it was when the only route
+   * in was from the setup screen. Assuming `setup` is correct today and would
+   * strand anyone the moment a second entry point opened this mid-game.
+   */
+  const back = () => {
+    if (!gameId) return navigate({ name: 'team', teamId: teamId as string });
+    if (game?.status === 'live') return navigate({ name: 'live', gameId });
+    if (game?.status === 'final') return navigate({ name: 'summary', gameId });
+    navigate({ name: 'setup', gameId });
+  };
 
   if (!target || !draft || size === null) return <Screen title="Loading…">{null}</Screen>;
 

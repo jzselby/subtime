@@ -25,13 +25,21 @@ export function SetupScreen({ gameId }: { gameId: string }) {
 
   const { state, recordMany } = useGameLog(gameId, game?.config ?? DEFAULT_CFG);
 
+  /*
+   * Retired players are off future team sheets but not out of games they are
+   * already part of: one retired mid-season still appears on a game recorded
+   * before it, and one retired by mistake mid-setup does not vanish from a
+   * lineup that already names them.
+   */
   const roster = useMemo(
     () =>
-      [...(players ?? [])].sort(
-        (a, b) =>
-          (Number(a.number) || 999) - (Number(b.number) || 999) || a.name.localeCompare(b.name),
-      ),
-    [players],
+      (players ?? [])
+        .filter((p) => p.active !== 0 || state.attendance.has(p.id))
+        .sort(
+          (a, b) =>
+            (Number(a.number) || 999) - (Number(b.number) || 999) || a.name.localeCompare(b.name),
+        ),
+    [players, state.attendance],
   );
 
   /*

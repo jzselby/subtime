@@ -1,5 +1,5 @@
 import type { GameConfig, GameEvent } from '@subtime/core';
-import { defaultConfig } from '@subtime/core';
+import { appearsInLog, defaultConfig, reduce } from '@subtime/core';
 import Dexie, { type EntityTable } from 'dexie';
 import type { Formation } from './formations';
 import { defaultFormation } from './formations';
@@ -136,6 +136,66 @@ export async function deleteGame(gameId: string): Promise<void> {
     await db.events.where('gameId').equals(gameId).delete();
     await db.games.delete(gameId);
   });
+}
+
+/** What a player would take with them, and whether they are on a pitch right now. */
+export interface PlayerHistory {
+  /** Games whose log names this player, in any role. */
+  games: number;
+  /**
+   * On the field in a game that has not finished.
+   *
+   * Deliberately narrower than "has an unfinished game". Retiring is safe at any
+   * time — the live screen derives its squad from the event log, not the roster
+   * table — so the only case worth refusing is pulling someone out from under a
+   * match in progress. A game sitting half-set-up from last week must not stop a
+   * coach tidying the roster.
+   */
+  onFieldNow: boolean;
+}
+
+export async function playerHistory(player: Player): Promise<PlayerHistory> {
+  const games = await db.games.where('teamId').equals(player.teamId).toArray();
+  let count = 0;
+  let onFieldNow = false;
+  for (const game of games) {
+    const events = await db.events.where('gameId').equals(game.id).sortBy('seq');
+    if (!appearsInLog(events, player.id)) continue;
+    count += 1;
+    if (game.status === 'final') continue;
+    const { state } = reduce(events, game.config, game.id);
+    if (state.onField.has(player.id)) onFieldNow = true;
+  }
+  return { games: count, onFieldNow };
+}
+
+/**
+ * Take a player off the roster without taking them out of the record.
+ *
+ * The event log is the single source of truth for every number this app
+ * reports, and it stores player *ids*. Deleting the row those ids point at does
+ * not remove the player from a past game — it removes their *name*, leaving the
+ * stint timeline, the summary and the exported CSV attributing goals to a raw
+ * UUID, permanently and with no way back.
+ *
+ * So a player who has played is retired, not deleted: hidden from the roster and
+ * from future team sheets, still named everywhere they appear. `active` has been
+ * in the schema and indexed since v1 for exactly this. A player with no recorded
+ * history — a mistyped name, a trialist who never turned up — has nothing to
+ * orphan and is deleted outright.
+ */
+export async function removePlayer(player: Player): Promise<'retired' | 'deleted'> {
+  const { games } = await playerHistory(player);
+  if (games === 0) {
+    await db.players.delete(player.id);
+    return 'deleted';
+  }
+  await db.players.update(player.id, { active: 0 });
+  return 'retired';
+}
+
+export async function restorePlayer(playerId: string): Promise<void> {
+  await db.players.update(playerId, { active: 1 });
 }
 
 export async function deleteTeam(teamId: string): Promise<void> {

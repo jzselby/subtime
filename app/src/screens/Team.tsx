@@ -1,7 +1,17 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Screen, Sheet } from '../components';
-import { createGame, db, deleteTeam, uid, type Team } from '../db';
+import {
+  createGame,
+  db,
+  deleteTeam,
+  playerHistory,
+  removePlayer,
+  restorePlayer,
+  uid,
+  type Player,
+  type Team,
+} from '../db';
 import { navigate } from '../router';
 
 export function TeamScreen({ teamId }: { teamId: string }) {
@@ -19,9 +29,31 @@ export function TeamScreen({ teamId }: { teamId: string }) {
 
   if (!team) return <Screen title="Loading…">{null}</Screen>;
 
-  const roster = [...(players ?? [])].sort(
-    (a, b) => (Number(a.number) || 999) - (Number(b.number) || 999) || a.name.localeCompare(b.name),
-  );
+  const byNumber = (a: Player, b: Player) =>
+    (Number(a.number) || 999) - (Number(b.number) || 999) || a.name.localeCompare(b.name);
+  const roster = (players ?? []).filter((p) => p.active !== 0).sort(byNumber);
+  const retired = (players ?? []).filter((p) => p.active === 0).sort(byNumber);
+
+  /*
+   * Removing a player is two different operations wearing one button, and which
+   * one it is depends on whether they have played. The confirm says which, so
+   * "Remove" never silently means something other than what was expected.
+   */
+  const remove = async (player: Player) => {
+    const { games, onFieldNow } = await playerHistory(player);
+    if (onFieldNow) {
+      alert(`${player.name} is on the field in a game in progress. Sub them off first.`);
+      return;
+    }
+    const message =
+      games === 0
+        ? `Remove ${player.name}? They have not played a game, so nothing is recorded against them.`
+        : `${player.name} has played ${games} game${games === 1 ? '' : 's'}.\n\n` +
+          'They will be retired: taken off the roster and out of future team sheets, ' +
+          'but still named in every game they played. You can restore them later.';
+    if (!confirm(message)) return;
+    await removePlayer(player);
+  };
 
   return (
     <Screen
@@ -89,7 +121,7 @@ export function TeamScreen({ teamId }: { teamId: string }) {
             <button
               className="btn ghost small"
               style={{ minHeight: 36, padding: '0 10px' }}
-              onClick={() => void db.players.delete(player.id)}
+              onClick={() => void remove(player)}
             >
               Remove
             </button>
@@ -99,6 +131,32 @@ export function TeamScreen({ teamId }: { teamId: string }) {
       <button className="btn block" onClick={() => setSheet('player')}>
         + Add player
       </button>
+
+      {retired.length > 0 && (
+        <>
+          <h2 style={{ marginTop: 10 }}>Retired · {retired.length}</h2>
+          <p className="small muted" style={{ marginTop: -6 }}>
+            Off the roster, still named in the games they played.
+          </p>
+          <div className="plist">
+            {retired.map((player) => (
+              <div key={player.id} className="prow" style={{ cursor: 'default', opacity: 0.7 }}>
+                <span className="num-badge">{player.number || '–'}</span>
+                <span className="grow">
+                  <span className="name">{player.name}</span>
+                </span>
+                <button
+                  className="btn ghost small"
+                  style={{ minHeight: 36, padding: '0 10px' }}
+                  onClick={() => void restorePlayer(player.id)}
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {sheet === 'player' && (
         <AddPlayerSheet teamId={teamId} onClose={() => setSheet(null)} />
