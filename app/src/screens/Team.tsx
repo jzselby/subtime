@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { minutesOf, Screen, Sheet } from '../components';
 import {
@@ -26,6 +27,7 @@ export function TeamScreen({ teamId }: { teamId: string }) {
   );
 
   const [sheet, setSheet] = useState<'player' | 'game' | 'settings' | null>(null);
+  const [editing, setEditing] = useState<Player | null>(null);
 
   if (!team) return <Screen title="Loading…">{null}</Screen>;
 
@@ -121,19 +123,18 @@ export function TeamScreen({ teamId }: { teamId: string }) {
       <h2 style={{ marginTop: 10 }}>Roster · {roster.length}</h2>
       <div className="plist">
         {roster.map((player) => (
-          <div key={player.id} className="prow" style={{ cursor: 'default' }}>
-            <span className="num-badge">{player.number || '–'}</span>
-            <span className="grow">
-              <span className="name">{player.name}</span>
-            </span>
+          <RosterRow key={player.id} player={player} onTap={() => setEditing(player)}>
             <button
               className="btn ghost small"
               style={{ minHeight: 36, padding: '0 10px' }}
-              onClick={() => void remove(player)}
+              onClick={(e) => {
+                e.stopPropagation();
+                void remove(player);
+              }}
             >
               Remove
             </button>
-          </div>
+          </RosterRow>
         ))}
       </div>
       <button className="btn block" onClick={() => setSheet('player')}>
@@ -148,19 +149,23 @@ export function TeamScreen({ teamId }: { teamId: string }) {
           </p>
           <div className="plist">
             {retired.map((player) => (
-              <div key={player.id} className="prow" style={{ cursor: 'default', opacity: 0.7 }}>
-                <span className="num-badge">{player.number || '–'}</span>
-                <span className="grow">
-                  <span className="name">{player.name}</span>
-                </span>
+              <RosterRow
+                key={player.id}
+                player={player}
+                dim
+                onTap={() => setEditing(player)}
+              >
                 <button
                   className="btn ghost small"
                   style={{ minHeight: 36, padding: '0 10px' }}
-                  onClick={() => void restorePlayer(player.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void restorePlayer(player.id);
+                  }}
                 >
                   Restore
                 </button>
-              </div>
+              </RosterRow>
             ))}
           </div>
         </>
@@ -171,7 +176,95 @@ export function TeamScreen({ teamId }: { teamId: string }) {
       )}
       {sheet === 'game' && <NewGameSheet team={team} onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <SettingsSheet team={team} onClose={() => setSheet(null)} />}
+      {editing && <EditPlayerSheet player={editing} onClose={() => setEditing(null)} />}
     </Screen>
+  );
+}
+
+/**
+ * A row is not a `<button>` itself — it holds a real `<button>` (Remove or
+ * Restore) inside, and nested buttons are invalid HTML that browsers recover
+ * from by silently breaking one of the two. `role="button"` + a key handler
+ * gets the same tap target and keyboard access without that trap.
+ */
+function RosterRow({
+  player,
+  dim,
+  onTap,
+  children,
+}: {
+  player: Player;
+  dim?: boolean;
+  onTap: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="prow"
+      role="button"
+      tabIndex={0}
+      style={dim ? { opacity: 0.7 } : undefined}
+      onClick={onTap}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onTap();
+        }
+      }}
+    >
+      <span className="num-badge">{player.number || '–'}</span>
+      <span className="grow">
+        <span className="name">{player.name}</span>
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** Fixes a typo or a renumbering without touching the games already played. */
+function EditPlayerSheet({ player, onClose }: { player: Player; onClose: () => void }) {
+  const [name, setName] = useState(player.name);
+  const [number, setNumber] = useState(player.number);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    await db.players.update(player.id, { name: name.trim(), number: number.trim() });
+    onClose();
+  };
+
+  return (
+    <Sheet title="Edit player" onClose={onClose}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div className="row">
+          <label className="field" style={{ width: 92 }}>
+            <span>Number</span>
+            <input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              inputMode="numeric"
+              placeholder="7"
+            />
+          </label>
+          <label className="field grow">
+            <span>Name</span>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Alex Morgan"
+              onKeyDown={(e) => e.key === 'Enter' && void save()}
+            />
+          </label>
+        </div>
+        <p className="small muted" style={{ marginTop: -6 }}>
+          Games already recorded still show the same stints and stats —
+          they'll just read the corrected name or number.
+        </p>
+        <button className="btn primary block" disabled={!name.trim()} onClick={() => void save()}>
+          Save
+        </button>
+      </div>
+    </Sheet>
   );
 }
 

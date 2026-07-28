@@ -138,6 +138,14 @@ with.
   same recovery an accidental "End half" already gets.
 - **Delete game** is in the same menu, and in ••• on the stats screen.
 
+### Editing a player
+
+Tap anyone on the roster — active or retired — to fix a typo in their name or
+change their number. It's an in-place update, not a new player: the id stays
+the same, so a correction shows up everywhere that id is already looked up,
+including a game recorded before the fix. **Remove**/**Restore** sit on the
+same row as a separate button and don't open the editor when tapped.
+
 ### Removing a player
 
 **Remove** on the roster means one of two things, and the confirm says which. A
@@ -152,7 +160,7 @@ the exported CSV start attributing goals to a raw UUID with no way back.
 
 ## What works today
 
-Rosters and teams · attendance · **formations from 4v4 to 11v11 with named
+Rosters and teams · **edit a player's name or number in place** · attendance · **formations from 4v4 to 11v11 with named
 presets and drag-anywhere custom shapes** · configurable periods, length, and
 keeper weighting · **a field view with a shirt per position** plus a list view ·
 live clock with stoppages · subs and position changes · goals, assists, and
@@ -231,6 +239,7 @@ node scripts/drag.mjs                     # drag-to-sub, as real pointer gesture
 node scripts/bench-touch.mjs              # the bench, under real touch input
 node scripts/initials.mjs                 # shirt circles: number, else initials
 node scripts/edit.mjs                     # correcting a recorded game
+node scripts/edit-player.mjs              # correcting a roster player in place
 node scripts/clock.mjs                    # the clock across a period boundary
 node scripts/export.mjs                   # the HTML report and CSV: download, share, email
 node scripts/sheets.mjs                   # nothing covers a sheet's buttons
@@ -274,6 +283,14 @@ untouched by any of it.
 `scripts/edit.mjs` tests the claim the event log makes: it attributes a goal to
 the wrong player, corrects it in the editor, and confirms the stats screen moves
 the goal — then deletes a substitution and confirms the squad goes back.
+
+`scripts/edit-player.mjs` covers correcting a roster entry rather than a
+recorded event: it renames a misspelled player and renumbers them, checks the
+change reaches a game that was already recorded before the fix, and guards a
+specific regression — the roster row holds a real `<button>` (Remove) inside
+a `div` wearing `role="button"`, since nested `<button>`s are invalid HTML, so
+a tap on Remove has to stop there and not also pop the editor open underneath
+it. Verified with teeth: dropping the `stopPropagation` call fails the test.
 
 `scripts/clock.mjs` plays a deliberately short first half, ends it from the ■
 button, and starts the second. It exists because a real reading was wrong: the
