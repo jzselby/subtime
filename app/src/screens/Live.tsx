@@ -3,7 +3,8 @@ import { clockAt, displayClockMs, fairness, formatClock, playerStats } from '@su
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { beep, heatColor, mmss, PlayerRow, Sheet } from '../components';
-import { db } from '../db';
+import { db, deleteGame } from '../db';
+import { describeEvent } from '../describe';
 import { codesOf } from '../formations';
 import type { EventInput } from '../hooks';
 import { useGameLog, useNow, useWakeLock } from '../hooks';
@@ -539,6 +540,21 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             >
               Stats and playing time
             </button>
+            <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
+              Modify events
+            </button>
+            <button
+              className="btn danger block"
+              onClick={() => {
+                if (confirm(`Delete this game and everything recorded in it?`)) {
+                  void deleteGame(gameId).then(() =>
+                    navigate({ name: 'team', teamId: game.teamId }),
+                  );
+                }
+              }}
+            >
+              Delete game
+            </button>
           </div>
         </Sheet>
       )}
@@ -594,7 +610,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 <time>
                   {formatClock(displayClockMs(config, Math.max(e.period, 1), e.gameClockMs))}
                 </time>
-                <span>{describe(e, nameOf)}</span>
+                <span>{describeEvent(e, nameOf)}</span>
               </div>
             ))}
             {events.length === 0 && <p className="muted">Nothing recorded yet.</p>}
@@ -613,7 +629,24 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 key={position}
                 className={`chip${state.onField.get(movingPlayer) === position ? ' sel' : ''}`}
                 onClick={() => {
-                  void record({ type: 'POSITION_CHANGE', playerId: movingPlayer, to: position });
+                  /*
+                   * If someone is already there the two trade places. Sending a
+                   * player to an occupied position without moving its occupant
+                   * left both holding the same code, and the pitch can only draw
+                   * one of them.
+                   */
+                  const sitting = [...state.onField.entries()].find(
+                    ([id, code]) => code === position && id !== movingPlayer,
+                  )?.[0];
+                  const mine = state.onField.get(movingPlayer);
+                  if (sitting && mine) {
+                    void recordMany([
+                      { type: 'POSITION_CHANGE', playerId: movingPlayer, to: position },
+                      { type: 'POSITION_CHANGE', playerId: sitting, to: mine },
+                    ]);
+                  } else {
+                    void record({ type: 'POSITION_CHANGE', playerId: movingPlayer, to: position });
+                  }
                   setMovingPlayer(null);
                 }}
               >
@@ -678,38 +711,3 @@ function GoalSheet({
   );
 }
 
-/** Human-readable line for the event log. Narrows on the discriminated union. */
-function describe(e: GameEvent, nameOf: (id: string) => { name: string } | undefined): string {
-  const nm = (id: string | null | undefined) => (id ? (nameOf(id)?.name ?? '?') : 'unknown');
-  switch (e.type) {
-    case 'PERIOD_START':
-      return `Period ${e.period} started`;
-    case 'PERIOD_END':
-      return `Period ${e.period} ended`;
-    case 'CLOCK_PAUSE':
-      return 'Clock stopped';
-    case 'CLOCK_RESUME':
-      return 'Clock restarted';
-    case 'SUB': {
-      const off = e.off.map(nm).join(', ') || '—';
-      const on = e.on.map((s) => nm(s.playerId)).join(', ') || '—';
-      return `Sub: ${off} off, ${on} on`;
-    }
-    case 'POSITION_CHANGE':
-      return `${nm(e.playerId)} → ${e.to}`;
-    case 'GOAL':
-      return `Goal: ${nm(e.scorerId)}${e.assistId ? ` (assist ${nm(e.assistId)})` : ''}${e.ownGoal ? ' — own goal' : ''}`;
-    case 'OPPONENT_GOAL':
-      return 'Opponent scored';
-    case 'SET_LINEUP':
-      return `Lineup set (${e.slots.length} players)`;
-    case 'ATTENDANCE':
-      return `${nm(e.playerId)}: ${e.status}`;
-    case 'CARD':
-      return `${e.card} card: ${nm(e.playerId)}`;
-    case 'NOTE':
-      return e.text;
-    default:
-      return e.type;
-  }
-}

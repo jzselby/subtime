@@ -1,8 +1,8 @@
 import { elapsedGameMs, fairnessIndex, formatClock, playerStats } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
-import { mins, mmss, Screen } from '../components';
-import { db } from '../db';
+import { mins, mmss, Screen, Sheet } from '../components';
+import { db, deleteGame } from '../db';
 import { useGameLog, useNow } from '../hooks';
 import { navigate } from '../router';
 
@@ -27,6 +27,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   const { state, errors } = useGameLog(gameId, config);
   const now = useNow(state.status === 'running');
   const [copied, setCopied] = useState(false);
+  const [menu, setMenu] = useState(false);
 
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
@@ -125,6 +126,11 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
             : { name: 'live', gameId },
         )
       }
+      action={
+        <button className="btn ghost" onClick={() => setMenu(true)} aria-label="More">
+          •••
+        </button>
+      }
       footer={
         <div className="actions">
           <button className="btn" onClick={() => void copy()}>
@@ -141,6 +147,28 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
         </div>
       }
     >
+      {menu && (
+        <Sheet title={`vs ${game.opponent || 'TBD'}`} onClose={() => setMenu(false)}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
+              Modify events
+            </button>
+            <button
+              className="btn danger block"
+              onClick={() => {
+                if (confirm('Delete this game and everything recorded in it?')) {
+                  void deleteGame(gameId).then(() =>
+                    navigate({ name: 'team', teamId: game.teamId }),
+                  );
+                }
+              }}
+            >
+              Delete game
+            </button>
+          </div>
+        </Sheet>
+      )}
+
       {errors.length > 0 && (
         <div className="banner error">
           {errors.length} event{errors.length === 1 ? '' : 's'} in this game's log could

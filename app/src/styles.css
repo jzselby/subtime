@@ -1243,3 +1243,12 @@ label.field > span {
   padding: 0 10px;
   font-size: 13px;
 }
+
+/* Event-log rows: clock on the left, so the list scans as a timeline. */
+.evtime {
+  flex: none;
+  width: 52px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

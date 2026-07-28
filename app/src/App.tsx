@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { requestPersistence } from './db';
 import { useRoute } from './router';
+import { EventsScreen } from './screens/Events';
 import { FormationScreen } from './screens/Formation';
 import { HomeScreen } from './screens/Home';
 import { LiveScreen } from './screens/Live';
@@ -30,6 +31,8 @@ export function App() {
       return <LiveScreen key={route.gameId} gameId={route.gameId} />;
     case 'summary':
       return <SummaryScreen key={route.gameId} gameId={route.gameId} />;
+    case 'events':
+      return <EventsScreen key={route.gameId} gameId={route.gameId} />;
     default:
       return <HomeScreen />;
   }

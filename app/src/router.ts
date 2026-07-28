@@ -13,7 +13,8 @@ export type Route =
   | { name: 'gameFormation'; gameId: string }
   | { name: 'setup'; gameId: string }
   | { name: 'live'; gameId: string }
-  | { name: 'summary'; gameId: string };
+  | { name: 'summary'; gameId: string }
+  | { name: 'events'; gameId: string };
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
@@ -26,6 +27,7 @@ export function parseHash(hash: string): Route {
     if (tail === 'setup') return { name: 'setup', gameId: id };
     if (tail === 'formation') return { name: 'gameFormation', gameId: id };
     if (tail === 'summary') return { name: 'summary', gameId: id };
+    if (tail === 'events') return { name: 'events', gameId: id };
     return { name: 'live', gameId: id };
   }
   return { name: 'home' };
@@ -47,6 +49,8 @@ export function hashFor(route: Route): string {
       return `#/game/${route.gameId}`;
     case 'summary':
       return `#/game/${route.gameId}/summary`;
+    case 'events':
+      return `#/game/${route.gameId}/events`;
   }
 }
 

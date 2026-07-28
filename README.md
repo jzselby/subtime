@@ -105,6 +105,11 @@ what makes rows collide.) The formation is captioned top-left.
   if you change nothing — not a statement about right now.
 - **Stop clock** for injuries. Stoppage time never counts as playing time.
 - **Undo** removes the last event. Tapping the wrong name costs one tap to fix.
+- **Modify events** (in the ••• menu) corrects anything already recorded — a goal
+  given to the wrong player, a card on the wrong name, a substitution that never
+  happened. Every number re-derives from the corrected log, so fixing it there
+  fixes the minutes, the stats and the timeline at once.
+- **Delete game** is in the same menu, and in ••• on the stats screen.
 
 ## What works today
 
@@ -153,6 +158,7 @@ npx vite preview --port 4173 --workspace app
 node scripts/smoke.mjs                    # drives a whole game in a real browser
 node scripts/resume.mjs                   # leaves mid-game and comes back
 node scripts/drag.mjs                     # drag-to-sub, as real pointer gestures
+node scripts/edit.mjs                     # correcting a recorded game
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
@@ -170,6 +176,10 @@ and the app must land back on the live screen, still substitutable.
 and checks the resulting squad, plus that a press without movement is still a tap.
 It caught a drop that also fired the tap handler underneath it and left a sheet
 covering the pitch.
+
+`scripts/edit.mjs` tests the claim the event log makes: it attributes a goal to
+the wrong player, corrects it in the editor, and confirms the stats screen moves
+the goal — then deletes a substitution and confirms the squad goes back.
 
 `scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
 asserts the page does not scroll, the whole pitch is on screen, and **no two
