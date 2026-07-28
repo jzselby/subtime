@@ -5,6 +5,7 @@ import { EventsScreen } from './screens/Events';
 import { FormationScreen } from './screens/Formation';
 import { HomeScreen } from './screens/Home';
 import { LiveScreen } from './screens/Live';
+import { SeasonScreen } from './screens/Season';
 import { SetupScreen } from './screens/Setup';
 import { SummaryScreen } from './screens/Summary';
 import { TeamScreen } from './screens/Team';
@@ -21,6 +22,8 @@ export function App() {
   switch (route.name) {
     case 'team':
       return <TeamScreen key={route.teamId} teamId={route.teamId} />;
+    case 'season':
+      return <SeasonScreen key={route.teamId} teamId={route.teamId} />;
     case 'formation':
       return <FormationScreen key={route.teamId} teamId={route.teamId} />;
     case 'gameFormation':

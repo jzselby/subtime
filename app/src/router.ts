@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 export type Route =
   | { name: 'home' }
   | { name: 'team'; teamId: string }
+  | { name: 'season'; teamId: string }
   | { name: 'formation'; teamId: string }
   | { name: 'gameFormation'; gameId: string }
   | { name: 'setup'; gameId: string }
@@ -21,6 +22,7 @@ export function parseHash(hash: string): Route {
   const [head, id, tail] = parts;
   if (head === 'team' && id) {
     if (tail === 'formation') return { name: 'formation', teamId: id };
+    if (tail === 'season') return { name: 'season', teamId: id };
     return { name: 'team', teamId: id };
   }
   if (head === 'game' && id) {
@@ -39,6 +41,8 @@ export function hashFor(route: Route): string {
       return '#/';
     case 'team':
       return `#/team/${route.teamId}`;
+    case 'season':
+      return `#/team/${route.teamId}/season`;
     case 'formation':
       return `#/team/${route.teamId}/formation`;
     case 'gameFormation':

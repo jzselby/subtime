@@ -160,6 +160,7 @@ opponent goals · live fairness ordering and sub suggestions · shift alarm · u
 and a full event log · per-game report with playing-time bars, a who-was-on-when
 timeline, plus/minus and **minutes in each position by name** · copy-to-clipboard
 summary · **a styled HTML report, or CSV, by download, share sheet or email** ·
+**season totals per player, summed across every game a team has started** ·
 installable, offline, survives a reload mid-game.
 
 The report is what's meant to be opened and read: a styled HTML page, one clean
@@ -196,16 +197,27 @@ back off (a formation always keeps at least one). Coordinates are normalised, so
 your shape looks the same on any screen. Each game snapshots the formation it
 was played in, so changing your shape later never rewrites an old game.
 
+### Season stats
+
+**Season stats ›**, off the Team screen, sums every started game's per-player
+report into one table — games played, minutes, positions, goals, assists,
++/-. There is no separate season table to fall out of sync: a team's games and
+their event logs are already the whole record, so this is a fold over what's
+already stored (`playerStats()` per game, summed by `aggregatePlayerStats()`),
+computed fresh each time the screen opens. Games still in **setup** don't
+count — they haven't been played — but a **live** game counts as it happens,
+so the season total updates mid-match, not just once a game is finalised.
+
 ## What doesn't yet
 
 Server sync and multi-device (Phase 2) · the shift **planner** that pre-generates
 a whole rotation, as opposed to the live suggestions that exist now (Phase 3) ·
-season-level rollups across games and read-only share links for the head coach
-(Phase 4). See [`DESIGN.md`](./DESIGN.md).
+read-only share links for the head coach, so season stats don't require handing
+over the phone (Phase 4). See [`DESIGN.md`](./DESIGN.md).
 
 Today the phone holds the only copy of your data. The app asks the browser for
-persistent storage, but that is best-effort — export a CSV after games you care
-about until sync lands.
+persistent storage, but that is best-effort — export a report after games you
+care about until sync lands.
 
 ## Testing
 
@@ -226,6 +238,7 @@ node scripts/roster.mjs                   # removing a player keeps the record
 node scripts/endgame.mjs                  # ending a game early, and un-ending it
 node scripts/formation-editor.mjs         # more shapes, and building a custom one
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
+node scripts/season.mjs                   # season totals actually sum across games
 ```
 
 `scripts/smoke.mjs` plays a full two-half game through the actual UI — roster,
@@ -317,6 +330,14 @@ removing the guard in `Formation.tsx` and re-running fails the test.
 asserts the page does not scroll, the whole pitch is on screen, and **no two
 player tokens overlap**. That last check is the point: a squashed pitch still
 "fits" while being unusable, which a pure size assertion misses.
+
+`scripts/season.mjs` plays two full games for the same team and checks the
+season screen actually sums across them rather than only reflecting whichever
+game loaded last — the mistake an implementation keying off "the current
+game's stats" instead of folding every game would make. The same starting
+lineup in both games should credit the same player with the same goal twice,
+every player should show two games played, and the per-game position minutes
+should combine, not overwrite.
 
 The engine's own guarantee is documented in [`core/README.md`](./core/README.md):
 `Σ player minutes == ∫ onFieldCount dt`, verified two independent ways over

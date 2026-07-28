@@ -8,7 +8,7 @@ See [`../DESIGN.md`](../DESIGN.md) for why it is built this way.
 
 ```bash
 npm install
-npm test          # 46 tests, including ~3,000 generated games
+npm test          # 48 tests, including ~3,000 generated games
 npm run typecheck
 npm run build
 ```
@@ -31,6 +31,10 @@ const { state, errors } = reduce(events, config);
 playerStats(state, Date.now());   // minutes, bench, plus/minus, minutes by position
 fairness(state, Date.now());      // live table, most-owed first
 ```
+
+Sum that across a team's games for a season total — `aggregatePlayerStats()`
+takes an array of `playerStats()` results, one per game, and folds them into
+one row per player: games played, minutes, positions, goals, assists, +/-.
 
 To record something, stamp it against current state and append it:
 
@@ -108,6 +112,11 @@ that leaves stints open — are each caught by at least one test.
 ## Not yet built
 
 `fairness()` covers equal and weighted targets and suggests subs, but the
-**shift planner** (pre-generating a whole rotation) is Phase 3. Season-level
-rollups across games belong in SQL over the persisted `player_game_stats`, not
-here.
+**shift planner** (pre-generating a whole rotation) is Phase 3.
+
+Season-level rollups are `aggregatePlayerStats()`: sum an array of `playerStats()`
+results, one per game, into one row per player. It takes already-computed rows
+rather than events or a database handle, so it stays framework-free — the
+caller folds each game's log with `reduce()` + `playerStats()` however it
+likes and hands the results here. No persisted rollup table; a team's history
+is already the full record; a season total is a read, not new state.

@@ -21,6 +21,7 @@ export { appendEvent, newEventId } from './append.js';
 export type { EventInput } from './append.js';
 export { appearsInLog, playerIdsIn } from './players.js';
 export {
+  aggregatePlayerStats,
   availablePlayers,
   fairness,
   fairnessIndex,
@@ -32,4 +33,4 @@ export {
   suggestSubsOn,
   totalPlayedMs,
 } from './stats.js';
-export type { FairnessRow, PlayerGameStats } from './stats.js';
+export type { FairnessRow, PlayerGameStats, PlayerSeasonStats } from './stats.js';

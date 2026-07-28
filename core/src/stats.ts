@@ -205,6 +205,89 @@ export function playerStats(state: GameState, nowWallTs: number): PlayerGameStat
 }
 
 // ---------------------------------------------------------------------------
+// Season aggregation
+// ---------------------------------------------------------------------------
+
+export interface PlayerSeasonStats {
+  playerId: PlayerId;
+  /** Games actually played — present or late, and on the field for some of it. */
+  games: number;
+  playedMs: number;
+  benchMs: number;
+  msByPosition: Record<PositionCode, number>;
+  positionsPlayed: number;
+  goals: number;
+  assists: number;
+  plusMinus: number;
+  shots: number;
+  shotsOnTarget: number;
+  saves: number;
+  yellowCards: number;
+  redCards: number;
+}
+
+/**
+ * Sum a season's worth of `playerStats()` calls into one row per player.
+ *
+ * Takes already-computed per-game rows rather than games or events, so it
+ * stays framework-free and ignorant of storage — the caller folds each game's
+ * log with `reduce()` + `playerStats()` however it likes (a database query in
+ * the app, a fixture array in a test) and hands the results here.
+ */
+export function aggregatePlayerStats(perGame: readonly PlayerGameStats[][]): PlayerSeasonStats[] {
+  const blank = (playerId: PlayerId): PlayerSeasonStats => ({
+    playerId,
+    games: 0,
+    playedMs: 0,
+    benchMs: 0,
+    msByPosition: {},
+    positionsPlayed: 0,
+    goals: 0,
+    assists: 0,
+    plusMinus: 0,
+    shots: 0,
+    shotsOnTarget: 0,
+    saves: 0,
+    yellowCards: 0,
+    redCards: 0,
+  });
+
+  const rows = new Map<PlayerId, PlayerSeasonStats>();
+  const row = (playerId: PlayerId): PlayerSeasonStats => {
+    let r = rows.get(playerId);
+    if (!r) {
+      r = blank(playerId);
+      rows.set(playerId, r);
+    }
+    return r;
+  };
+
+  for (const game of perGame) {
+    for (const s of game) {
+      const r = row(s.playerId);
+      if (s.playedMs > 0) r.games += 1;
+      r.playedMs += s.playedMs;
+      r.benchMs += s.benchMs;
+      for (const [code, ms] of Object.entries(s.msByPosition)) {
+        r.msByPosition[code] = (r.msByPosition[code] ?? 0) + ms;
+      }
+      r.goals += s.goals;
+      r.assists += s.assists;
+      r.plusMinus += s.plusMinus;
+      r.shots += s.shots;
+      r.shotsOnTarget += s.shotsOnTarget;
+      r.saves += s.saves;
+      r.yellowCards += s.yellowCards;
+      r.redCards += s.redCards;
+    }
+  }
+
+  for (const r of rows.values()) r.positionsPlayed = Object.keys(r.msByPosition).length;
+
+  return [...rows.values()].sort((a, b) => a.playerId.localeCompare(b.playerId));
+}
+
+// ---------------------------------------------------------------------------
 // Fairness
 // ---------------------------------------------------------------------------
 

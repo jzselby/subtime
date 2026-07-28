@@ -66,7 +66,15 @@ export function TeamScreen({ teamId }: { teamId: string }) {
         </button>
       }
     >
-      <h2>Games</h2>
+      <div className="row spread">
+        <h2 style={{ margin: 0 }}>Games</h2>
+        <button
+          className="btn ghost small"
+          onClick={() => navigate({ name: 'season', teamId })}
+        >
+          Season stats ›
+        </button>
+      </div>
       {games?.length === 0 && <div className="empty">No games yet.</div>}
       <div className="plist">
         {games?.map((game) => (
