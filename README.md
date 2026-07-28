@@ -159,22 +159,30 @@ live clock with stoppages · subs and position changes · goals, assists, and
 opponent goals · live fairness ordering and sub suggestions · shift alarm · undo
 and a full event log · per-game report with playing-time bars, a who-was-on-when
 timeline, plus/minus and **minutes in each position by name** · copy-to-clipboard
-summary · **CSV by download, share sheet or email** · installable, offline,
-survives a reload mid-game.
+summary · **a styled HTML report, or CSV, by download, share sheet or email** ·
+installable, offline, survives a reload mid-game.
 
-The CSV opens as a small report, not a data dump: a few lines naming the team,
-opponent, date, final score and fairness, then one clean row per player —
-minutes, positions played, goals, assists, +/-. Cells are quoted only where the
+The report is what's meant to be opened and read: a styled HTML page, one clean
+table — player, number, minutes, bench, positions played, goals, assists,
++/-, shots, saves, stints — under a header naming the team, opponent, date,
+score and fairness. It opens in any browser, on any device, with no
+spreadsheet app required, which is the point of building it separately from
+the CSV rather than dressing the CSV up. The CSV stays underneath for a coach
+who wants to build their own spreadsheet: cells are quoted only where the
 syntax actually needs it, so the raw file reads as text and not as a wall of
-`"..."`. Sharing or emailing it always hands over the real file — mailto can't
-attach one, so Email saves it and puts the readable summary in the draft
-instead of pasting the CSV into the body.
+`"..."`, and a value starting with `=`, `+`, `-` or `@` is defused with a
+leading apostrophe so an imported name can't run as a formula. Sharing or
+emailing always hands over the report — mailto can't attach one, so Email
+saves it and puts the readable summary in the draft instead of pasting a
+table into the body.
 
 ### Formations
 
 Named the way a team sheet writes them, with the keeper counted: a 7-a-side 2-3-1
-is **1-2-3-1**. Presets for every squad size (7v7 gives 1-2-3-1, 1-3-2-1,
-1-2-1-2-1, 1-3-1-2; 11v11 gives 1-4-4-2, 1-4-3-3, 1-4-2-3-1, 1-3-5-2, 1-5-3-2).
+is **1-2-3-1**. Several named presets per squad size from 5v5 to 11v11 (7v7 gives
+1-2-3-1, 1-3-2-1, 1-2-1-2-1, 1-3-1-2, 1-2-2-2, 1-1-4-1; 9v9 gives 1-3-2-3, 1-3-3-2,
+1-2-3-3, 1-3-4-1, 1-2-4-2, 1-3-3-1-1; 11v11 gives 1-4-4-2, 1-4-3-3, 1-4-2-3-1,
+1-3-5-2, 1-5-3-2, 1-4-5-1, 1-3-4-3, 1-4-1-4-1, 1-4-3-2-1, 1-3-4-1-2, 1-5-4-1).
 
 Positions carry their line — `ST · F`, `CM · M`, `LB · D` — and lines are not
 flat rows: full-backs push up past the centre-backs, a midfield three holds
@@ -182,9 +190,11 @@ through the middle, wingers play off the striker's shoulder, and a strike pair
 stays central while a back four hugs the touchline.
 
 Pick a shape, then drag any position where you actually want it and save it to the
-team. Coordinates are normalised, so your shape looks the same on any screen. Each
-game snapshots the formation it was played in, so changing your shape later never
-rewrites an old game.
+team, or build one from scratch: **+ Add position** drops a new slot onto the
+pitch, tap any slot to rename its code or change its role, and Remove clears one
+back off (a formation always keeps at least one). Coordinates are normalised, so
+your shape looks the same on any screen. Each game snapshots the formation it
+was played in, so changing your shape later never rewrites an old game.
 
 ## What doesn't yet
 
@@ -210,7 +220,7 @@ node scripts/bench-touch.mjs              # the bench, under real touch input
 node scripts/initials.mjs                 # shirt circles: number, else initials
 node scripts/edit.mjs                     # correcting a recorded game
 node scripts/clock.mjs                    # the clock across a period boundary
-node scripts/export.mjs                   # download, share and email a CSV
+node scripts/export.mjs                   # the HTML report and CSV: download, share, email
 node scripts/sheets.mjs                   # nothing covers a sheet's buttons
 node scripts/roster.mjs                   # removing a player keeps the record
 node scripts/endgame.mjs                  # ending a game early, and un-ending it
@@ -259,18 +269,24 @@ four-second first half opened the second at 30:01. It now asserts the period
 clock restarts, the period label follows, and the whole-game total is the sum of
 what was played.
 
-`scripts/export.mjs` takes the CSV out all three ways. The download is checked end
-to end — the file lands, and its metadata block, header and goal column are
-parsed back. Share and email hand off to the OS, so those are caught at the
-boundary: `navigator.share` is stubbed and its file and text inspected, and the
-`mailto:` navigation is intercepted and its subject and body read — including
-that Email actually saves the CSV rather than only inlining it, and that
-neither route ever dumps the raw CSV into a message body.
+`scripts/export.mjs` takes the report and the CSV out all four ways. Both
+downloads are checked end to end: the CSV's metadata block, header and goal
+column are parsed back, and the report is confirmed to be a real HTML document
+with a table row per player and the fairness figure in the header. It also
+covers a player named `<b>Six</b> & "Quotes"` — a name is free text a coach
+types, the report is HTML rather than a sandboxed app screen, so anything that
+lands unescaped runs as markup the moment the file is opened, and the test
+asserts the name appears as text, not live tags. Share and email hand off to
+the OS, so those are caught at the boundary: `navigator.share` is stubbed and
+its file and text inspected, and the `mailto:` navigation is intercepted and
+its subject and body read — including that Email actually saves the report
+rather than only inlining it, and that neither route ever dumps the raw table
+into a message body.
 
 `scripts/sheets.mjs` guards a bug that only appeared on iOS. The header and the
 footer action bar are blurred, WebKit promotes a blurred element to its own
 compositing layer, and that layer painted over a sheet rendered between them —
-so **Delete game** sat underneath *Copy summary* and *Export CSV* and could not
+so **Delete game** sat underneath *Copy summary* and *Export* and could not
 be tapped. Chromium sorted the same markup correctly, which is why a screenshot
 proved nothing. Sheets now render through a portal into `<body>` and the blurred
 bars stand down while one is open; the test asserts both, and that every button
@@ -280,8 +296,8 @@ in every sheet is the topmost element at its own centre.
 history, and the CSV formula guard. It retires a player who has played, then
 reads their name back off the summary and the exported CSV; it deletes one who
 never played; it refuses to remove one who is on the pitch mid-match; and it
-checks a player named `=1+1` is defused on export while a negative plus/minus
-stays a number.
+checks a player named `=1+1` is defused on CSV export while a negative
+plus/minus stays a number.
 
 `scripts/endgame.mjs` covers ending a game early. From mid-first-half it checks
 that a quick tap on "Hold to end the game" does nothing, that holding it does,

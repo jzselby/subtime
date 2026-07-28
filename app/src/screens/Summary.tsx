@@ -41,6 +41,15 @@ export function csvCell(value: unknown): string {
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+};
+
+/** One HTML cell's text content, safe to inline into a template string. */
+export function escapeHtml(value: unknown): string {
+  return String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!);
+}
+
 export function SummaryScreen({ gameId }: { gameId: string }) {
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
   const team = useLiveQuery(
@@ -172,18 +181,111 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
     return lines.join('\r\n');
   };
 
-  const csvName = () =>
-    `${team.name}-vs-${game.opponent || 'game'}-${new Date(game.kickoffAt).toISOString().slice(0, 10)}.csv`
+  const fileStem = () =>
+    `${team.name}-vs-${game.opponent || 'game'}-${new Date(game.kickoffAt).toISOString().slice(0, 10)}`
       .replace(/[^\w.-]+/g, '-');
 
-  /** The file itself, with no side effect on the sheet — shared by every route below. */
-  const saveCsv = () => {
-    const url = URL.createObjectURL(new Blob([csvText()], { type: 'text/csv' }));
+  const csvName = () => `${fileStem()}.csv`;
+  const reportName = () => `${fileStem()}.html`;
+
+  /**
+   * A styled, standalone HTML page — the one meant to be opened and read, not
+   * imported. The CSV reads as raw comma-separated text the moment it lands
+   * outside a spreadsheet app; this renders as an actual table with headers
+   * and a title in any browser, on any platform, with no app required.
+   */
+  const reportHtml = () => {
+    const title = `${team.name} ${state.score.us}–${state.score.them} ${game.opponent || 'Opponent'}`;
+    const rows = byMinutes
+      .map(
+        (s) => `      <tr>
+        <td>${escapeHtml(nameOf(s.playerId))}</td>
+        <td class="num">${escapeHtml(numberOf(s.playerId) || '—')}</td>
+        <td class="num">${mins(s.playedMs)}</td>
+        <td class="num">${mins(s.benchMs)}</td>
+        <td>${escapeHtml(positionsForCsv(s.msByPosition) || '—')}</td>
+        <td class="num">${s.goals || ''}</td>
+        <td class="num">${s.assists || ''}</td>
+        <td class="num">${s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus || ''}</td>
+        <td class="num">${s.shots || ''}</td>
+        <td class="num">${s.saves || ''}</td>
+        <td class="num">${s.stintCount}</td>
+      </tr>`,
+      )
+      .join('\n');
+    return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0; padding: 24px; color: #1a1a1a; background: #fff; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .meta { color: #666; font-size: 14px; margin: 0; }
+  .fair { display: inline-block; margin-top: 14px; padding: 8px 12px; border-radius: 8px;
+    background: #eef6ee; color: #1a5c1a; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 14px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #e2e2e2; text-align: left; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  thead th { border-bottom: 2px solid #333; font-weight: 600; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #16181c; color: #e8e8e8; }
+    .meta { color: #9a9a9a; }
+    .fair { background: #17301a; color: #7fd98a; }
+    th, td { border-bottom-color: #2c2f36; }
+    thead th { border-bottom-color: #ccc; }
+    tbody tr:nth-child(even) { background: #1c1f26; }
+  }
+</style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <p class="meta">${escapeHtml(
+    new Date(game.kickoffAt).toLocaleDateString(undefined, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+  )}</p>
+  <div class="fair">Playing-time fairness: ${Math.round(index * 100)}%</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th><th class="num">#</th><th class="num">Min</th><th class="num">Bench</th>
+        <th>Positions</th><th class="num">G</th><th class="num">A</th><th class="num">+/&minus;</th>
+        <th class="num">Shots</th><th class="num">Saves</th><th class="num">Stints</th>
+      </tr>
+    </thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>
+</body>
+</html>
+`;
+  };
+
+  /** Downloads a Blob with no side effect on the sheet — shared by every route below. */
+  const saveFile = (contents: string, name: string, type: string) => {
+    const url = URL.createObjectURL(new Blob([contents], { type }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = csvName();
+    a.download = name;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const saveCsv = () => saveFile(csvText(), csvName(), 'text/csv');
+  const saveReport = () => saveFile(reportHtml(), reportName(), 'text/html');
+
+  const downloadReport = () => {
+    saveReport();
+    setShare(false);
   };
 
   const downloadCsv = () => {
@@ -193,25 +295,25 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
 
   /*
    * On a phone the share sheet is the only route to Messages, Mail, AirDrop and
-   * Files, and it is the only one that can carry the CSV as a real attachment.
-   * Where the platform can't take a file, the CSV is saved to downloads instead
-   * of pasted into the message as raw text — a wall of quoted, comma-separated
-   * cells is not something anyone wants to read in a text thread.
+   * Files, and it is the only one that can carry a file as a real attachment.
+   * The report — not the CSV — is what goes out this way: it is the one meant
+   * to be opened and read by someone else, and a wall of quoted CSV cells is
+   * not something anyone wants pasted into a text thread as a fallback either.
    */
-  const shareCsv = async () => {
+  const shareReport = async () => {
     const text = summaryText();
     const title = `${team.name} vs ${game.opponent || 'Opponent'}`;
     try {
-      const file = new File([csvText()], csvName(), { type: 'text/csv' });
+      const file = new File([reportHtml()], reportName(), { type: 'text/html' });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title, text, files: [file] });
       } else if (navigator.share) {
-        saveCsv();
-        await navigator.share({ title, text: `${text}\n\n(Full stats CSV saved to your downloads.)` });
+        saveReport();
+        await navigator.share({ title, text: `${text}\n\n(Full stats report saved to your downloads.)` });
       } else {
-        saveCsv();
+        saveReport();
         await navigator.clipboard.writeText(text);
-        alert('Sharing is not available in this browser — the summary was copied, and the CSV was saved to your downloads.');
+        alert('Sharing is not available in this browser — the summary was copied, and the report was saved to your downloads.');
       }
       setShare(false);
     } catch (err) {
@@ -222,15 +324,15 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
 
   /*
    * mailto cannot attach a file — there is no header for it, on any platform —
-   * so the CSV is saved to downloads and the body carries only the readable
+   * so the report is saved to downloads and the body carries only the readable
    * summary. Earlier this inlined the raw CSV into the body below a length
    * threshold, which for a normal-sized roster was under the threshold every
    * time: every email got a wall of quoted cells instead of a draft.
    */
-  const emailCsv = () => {
-    saveCsv();
+  const emailReport = () => {
+    saveReport();
     const subject = `${team.name} ${state.score.us}–${state.score.them} ${game.opponent || 'Opponent'} — stats`;
-    const body = `${summaryText()}\n\n(The full stats CSV was just saved to your downloads — attach it before sending.)`;
+    const body = `${summaryText()}\n\n(The full stats report was just saved to your downloads — attach it before sending.)`;
     window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setShare(false);
   };
@@ -257,7 +359,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
             {copied ? '✓ Copied' : 'Copy summary'}
           </button>
           <button className="btn" onClick={() => setShare(true)}>
-            Export CSV
+            Export
           </button>
           {state.status !== 'final' && (
             <button className="btn primary" onClick={() => navigate({ name: 'live', gameId })}>
@@ -270,23 +372,30 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
       {share && (
         <Sheet title="Export stats" onClose={() => setShare(false)}>
           <div style={{ display: 'grid', gap: 8 }}>
-            <button className="btn block stack" onClick={downloadCsv}>
-              Download CSV
+            <button className="btn primary block stack" onClick={downloadReport}>
+              Download report
               <span className="small muted" style={{ display: 'block' }}>
-                Saves the file — opens in Numbers, Excel or Sheets.
+                A readable page with the full table — the one to send another
+                coach. Opens in any browser.
               </span>
             </button>
-            <button className="btn block stack" onClick={() => void shareCsv()}>
+            <button className="btn block stack" onClick={() => void shareReport()}>
               Text or share…
               <span className="small muted" style={{ display: 'block' }}>
                 Messages, WhatsApp, AirDrop — anything in the share sheet.
               </span>
             </button>
-            <button className="btn block stack" onClick={emailCsv}>
+            <button className="btn block stack" onClick={emailReport}>
               Email
               <span className="small muted" style={{ display: 'block' }}>
-                Saves the CSV, then opens a draft with the summary — attach the
-                file before sending.
+                Saves the report, then opens a draft with the summary — attach
+                the file before sending.
+              </span>
+            </button>
+            <button className="btn block stack" onClick={downloadCsv}>
+              Download CSV
+              <span className="small muted" style={{ display: 'block' }}>
+                For your own spreadsheet — opens in Numbers, Excel or Sheets.
               </span>
             </button>
           </div>

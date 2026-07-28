@@ -171,7 +171,7 @@ await sheetIsClickable('stats menu');
 await page.keyboard.press('Escape');
 await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
 
-await page.click('.actions >> text=Export CSV');
+await page.click('.actions >> text=Export');
 await page.waitForSelector('text=Export stats');
 await page.waitForTimeout(400);
 await sheetIsClickable('export');

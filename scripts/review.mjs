@@ -175,7 +175,7 @@ for (const [tag, w, h] of DEVICES) {
   await p.waitForTimeout(200);
   await shot('31-summary-bottom');
 
-  await p.click('.actions >> text=Export CSV');
+  await p.click('.actions >> text=Export');
   await p.waitForTimeout(300);
   await shot('32-export');
   await p.click('.sheet >> text=Close');

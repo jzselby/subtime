@@ -108,7 +108,7 @@ await page.waitForTimeout(300);
 await page.click('[aria-label="More"]');
 await page.click('.sheet >> text=Stats and playing time');
 await page.waitForSelector('text=Playing-time fairness');
-await page.click('.actions >> text=Export CSV');
+await page.click('.actions >> text=Export');
 await page.waitForSelector('text=Export stats');
 const [dl] = await Promise.all([
   page.waitForEvent('download'),
@@ -176,7 +176,7 @@ const summary = await page.locator('main').innerText();
 check('the summary still names them', summary.includes('Alice Adams'), true);
 check('no raw id leaked into the summary', /[0-9a-f]{8}-[0-9a-f]{4}/.test(summary), false);
 
-await page.click('.actions >> text=Export CSV');
+await page.click('.actions >> text=Export');
 await page.waitForSelector('text=Export stats');
 const [dl2] = await Promise.all([
   page.waitForEvent('download'),
