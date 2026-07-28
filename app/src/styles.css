@@ -337,6 +337,11 @@ label.field > span {
   text-align: left;
 }
 
+/* The button's 600 weight would otherwise carry into the explanation. */
+.btn.stack .small {
+  font-weight: 400;
+}
+
 .btn.lg {
   min-height: 60px;
   font-size: 18px;
