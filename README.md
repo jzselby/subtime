@@ -248,6 +248,7 @@ node scripts/endgame.mjs                  # ending a game early, and un-ending i
 node scripts/formation-editor.mjs         # more shapes, and building a custom one
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 node scripts/season.mjs                   # season totals actually sum across games
+node scripts/keyboard.mjs                 # a sheet's input stays above the keyboard
 ```
 
 `scripts/smoke.mjs` plays a full two-half game through the actual UI — roster,
@@ -355,6 +356,19 @@ game's stats" instead of folding every game would make. The same starting
 lineup in both games should credit the same player with the same goal twice,
 every player should show two games played, and the per-game position minutes
 should combine, not overwrite.
+
+`scripts/keyboard.mjs` covers a sheet whose input grabs focus immediately —
+Add player, New team, New game, Rename — which used to open with the input
+already hidden behind the keyboard. `.sheet-backdrop` is `position: fixed;
+inset: 0`, sized against the *layout* viewport; iOS Safari doesn't shrink that
+for the keyboard, only `window.visualViewport.height` does, so a bottom-
+anchored sheet kept anchoring to a bottom that was now off-screen underneath
+it. Headless Chromium has no real on-screen keyboard, so the test drives the
+same mechanism the fix depends on directly: it overrides
+`visualViewport.height` and fires the `resize` event the fix listens for,
+then checks the backdrop — and the sheet inside it — actually shrink to fit
+above that line. Verified with teeth: removing the inline height override
+this relies on reproduces the original bug exactly, sheet included.
 
 The engine's own guarantee is documented in [`core/README.md`](./core/README.md):
 `Σ player minutes == ∫ onFieldCount dt`, verified two independent ways over

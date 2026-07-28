@@ -552,6 +552,9 @@ body.sheet-open .actions {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
+  /* Once the keyboard is up, React sets an inline `height` — see
+     useKeyboardSafeHeight in components.tsx — to keep the box (and the
+     bottom-anchored sheet inside it) above it rather than behind it. */
   z-index: 100;
   will-change: transform;
   display: flex;

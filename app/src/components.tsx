@@ -53,6 +53,33 @@ export function Screen({
  */
 let openSheets = 0;
 
+/**
+ * The visible height once the on-screen keyboard has taken its bite, or
+ * `undefined` where `visualViewport` isn't available.
+ *
+ * Reported: a sheet with an autofocusing input — Add player, New team, New
+ * game, Rename — opened with its input already behind the keyboard. `100dvh`
+ * (used elsewhere in this file for Safari's sliding toolbars) does not
+ * shrink for the keyboard; only `visualViewport.height` does. The layout
+ * viewport a `position: fixed; inset: 0` box sizes against is the *un*-shrunk
+ * one, so a bottom-anchored sheet kept anchoring to a bottom that was now
+ * off-screen underneath the keyboard.
+ */
+function useKeyboardSafeHeight(): number | undefined {
+  const [height, setHeight] = useState<number | undefined>(window.visualViewport?.height);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setHeight(vv.height);
+    update();
+    vv.addEventListener('resize', update);
+    return () => vv.removeEventListener('resize', update);
+  }, []);
+
+  return height;
+}
+
 export function Sheet({
   title,
   onClose,
@@ -68,6 +95,8 @@ export function Sheet({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  const keyboardSafeHeight = useKeyboardSafeHeight();
 
   useEffect(() => {
     openSheets += 1;
@@ -97,6 +126,7 @@ export function Sheet({
   return createPortal(
     <div
       className="sheet-backdrop"
+      style={keyboardSafeHeight !== undefined ? { height: keyboardSafeHeight } : undefined}
       onClick={onClose}
       role="dialog"
       aria-modal="true"

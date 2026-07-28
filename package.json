@@ -11,7 +11,7 @@
     "build": "npm run build --workspace core && npm run build --workspace app",
     "test": "npm run test --workspace core",
     "typecheck": "npm run typecheck --workspace core && npm run typecheck --workspace app",
-    "smoke": "node scripts/smoke.mjs && node scripts/resume.mjs && node scripts/drag.mjs && node scripts/bench-touch.mjs && node scripts/initials.mjs && node scripts/edit.mjs && node scripts/edit-player.mjs && node scripts/clock.mjs && node scripts/export.mjs && node scripts/sheets.mjs && node scripts/roster.mjs && node scripts/endgame.mjs && node scripts/formation-editor.mjs && node scripts/checkfit.mjs && node scripts/season.mjs",
+    "smoke": "node scripts/smoke.mjs && node scripts/resume.mjs && node scripts/drag.mjs && node scripts/bench-touch.mjs && node scripts/initials.mjs && node scripts/edit.mjs && node scripts/edit-player.mjs && node scripts/clock.mjs && node scripts/export.mjs && node scripts/sheets.mjs && node scripts/roster.mjs && node scripts/endgame.mjs && node scripts/formation-editor.mjs && node scripts/checkfit.mjs && node scripts/season.mjs && node scripts/keyboard.mjs",
     "preview": "npm run preview --workspace app"
   },
   "devDependencies": {
