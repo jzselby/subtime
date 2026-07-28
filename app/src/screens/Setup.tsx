@@ -80,7 +80,20 @@ export function SetupScreen({ gameId }: { gameId: string }) {
     <Screen
       title={`vs ${game.opponent || 'TBD'}`}
       subtitle={`${game.config.periods.count} × ${Math.round(game.config.periods.lengthMs / 60_000)} min · ${formation.name}`}
+      fill
       onBack={() => navigate({ name: 'team', teamId: game.teamId })}
+      action={
+        <button
+          className="btn ghost"
+          onClick={() => {
+            if (confirm('Delete this game?')) {
+              void deleteGame(gameId).then(() => navigate({ name: 'team', teamId: game.teamId }));
+            }
+          }}
+        >
+          Delete
+        </button>
+      }
       footer={
         <div className="actions">
           <button className="btn" disabled={filled >= needed} onClick={autoFill}>
@@ -97,6 +110,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       }
     >
       <h2>Who's here · {present.length} of {roster.length}</h2>
+      <div className="chipscroll">
       <div className="chips">
         {roster.map((p) => (
           <button
@@ -121,19 +135,17 @@ export function SetupScreen({ gameId }: { gameId: string }) {
           </button>
         ))}
       </div>
-      <p className="small muted">Tap to mark someone absent. Only players who are here get playing-time targets.</p>
+      </div>
 
-      <h2 style={{ marginTop: 8 }}>Starting lineup · {filled} of {needed}</h2>
-      <Pitch
-        formation={formation}
-        occupants={occupants}
-        onSlotTap={(slot) => setPicking(slot.id)}
-      />
-      <p className="small muted">
-        Tap a position to put someone there. Change the shape in Team → Formation.
-      </p>
+      <h2>Starting lineup · {filled} of {needed}</h2>
+      <div className="pitchwrap">
+        <Pitch
+          formation={formation}
+          occupants={occupants}
+          onSlotTap={(slot) => setPicking(slot.id)}
+        />
+      </div>
 
-      <h2>On the bench · {present.length - filled}</h2>
       <div className="benchstrip">
         {present
           .filter((p) => !assigned.has(p.id))
@@ -143,19 +155,10 @@ export function SetupScreen({ gameId }: { gameId: string }) {
               <span className="tname">{p.name}</span>
             </div>
           ))}
-        {present.length === filled && <p className="small muted">Everyone is in the lineup.</p>}
+        {present.length === filled && (
+          <p className="small muted">Everyone available is in the lineup.</p>
+        )}
       </div>
-
-      <button
-        className="btn danger block"
-        onClick={() => {
-          if (confirm('Delete this game?')) {
-            void deleteGame(gameId).then(() => navigate({ name: 'team', teamId: game.teamId }));
-          }
-        }}
-      >
-        Delete game
-      </button>
 
       {picking && (
         <Sheet

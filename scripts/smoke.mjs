@@ -168,7 +168,7 @@ check('still 7 on the pitch', onPitch.length, 7);
 await shot(page, 'live-after-sub');
 
 // The list view must stay in step with the pitch.
-await page.click('.seg >> text=List');
+await page.click('[aria-label="Switch to list view"]');
 await page.waitForTimeout(150);
 check(
   'list view agrees with the pitch',
@@ -176,7 +176,7 @@ check(
   7,
 );
 await shot(page, 'live-list');
-await page.click('.seg >> text=Field');
+await page.click('[aria-label="Switch to field view"]');
 await page.waitForTimeout(150);
 
 // -- goals -----------------------------------------------------------------

@@ -168,11 +168,21 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     <Screen
       title={`${team.name} vs ${game.opponent || 'TBD'}`}
       subtitle={`${periodLabel} · ${formation.name}`}
+      fill
       onBack={() => navigate({ name: 'team', teamId: game.teamId })}
       action={
-        <button className="btn ghost" onClick={() => navigate({ name: 'summary', gameId })}>
-          Stats
-        </button>
+        <>
+          <button
+            className="btn ghost"
+            aria-label={view === 'field' ? 'Switch to list view' : 'Switch to field view'}
+            onClick={() => setView(view === 'field' ? 'list' : 'field')}
+          >
+            {view === 'field' ? '☰' : '⌗'}
+          </button>
+          <button className="btn ghost" onClick={() => navigate({ name: 'summary', gameId })}>
+            Stats
+          </button>
+        </>
       }
       footer={
         hasSelection ? (
@@ -272,27 +282,8 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         onSummary={() => navigate({ name: 'summary', gameId })}
       />
 
-      <div className="seg" role="tablist" aria-label="View">
-        <button
-          role="tab"
-          aria-selected={view === 'field'}
-          className={view === 'field' ? 'on' : ''}
-          onClick={() => setView('field')}
-        >
-          Field
-        </button>
-        <button
-          role="tab"
-          aria-selected={view === 'list'}
-          className={view === 'list' ? 'on' : ''}
-          onClick={() => setView('list')}
-        >
-          List
-        </button>
-      </div>
-
       {view === 'field' ? (
-        <>
+        <div className="pitchwrap">
           <Pitch
             formation={formation}
             occupants={occupants}
@@ -303,39 +294,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 : tapVacant(slot.code, slot.id)
             }
           />
-
-          <h2>Bench · {benchRows.length}</h2>
-          {benchRows.length === 0 ? (
-            <div className="empty">Everyone is on.</div>
-          ) : (
-            <div className="benchstrip">
-              {benchRows.map((row) => {
-                const p = nameOf(row.playerId);
-                return (
-                  <button
-                    key={row.playerId}
-                    className={`bplayer${pickedOn.has(row.playerId) ? ' picked' : ''}`}
-                    onClick={() => toggle(pickedOn, row.playerId, setPickedOn)}
-                  >
-                    <span className="shirt" style={{ borderColor: heatColor(row.deficitMs) }}>
-                      {p?.number || p?.name.slice(0, 2) || '?'}
-                    </span>
-                    <span className="tname">{p?.name ?? row.playerId}</span>
-                    <span className="ttime">{mmss(stats.get(row.playerId)?.playedMs ?? 0)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <p className="small muted">
-            Tap a player on the pitch, then one on the bench, to swap them. Bench
-            is ordered by who is owed the most time; the ring colour says the same
-            thing. Tap an empty position to fill it — or select one player first
-            and tap an empty position to move them there.
-          </p>
-        </>
+        </div>
       ) : (
-        <>
+        <div className="pane">
           <h2>On the field · {onFieldRows.length}</h2>
           <div className="plist">
             {onFieldRows.map((row) => {
@@ -355,7 +316,6 @@ export function LiveScreen({ gameId }: { gameId: string }) {
               );
             })}
           </div>
-
           <h2>Bench · {benchRows.length}</h2>
           {benchRows.length === 0 && <div className="empty">Everyone is on.</div>}
           <div className="plist">
@@ -374,12 +334,32 @@ export function LiveScreen({ gameId }: { gameId: string }) {
               );
             })}
           </div>
-          <p className="small muted">
-            Sorted by who is owed the most time. Tap a player on the field, then a
-            player on the bench, to swap them.
-          </p>
-        </>
+        </div>
       )}
+
+      {view === 'field' &&
+        (benchRows.length === 0 ? (
+          <p className="small muted center">Everyone is on the field.</p>
+        ) : (
+          <div className="benchstrip">
+            {benchRows.map((row) => {
+              const p = nameOf(row.playerId);
+              return (
+                <button
+                  key={row.playerId}
+                  className={`bplayer${pickedOn.has(row.playerId) ? ' picked' : ''}`}
+                  onClick={() => toggle(pickedOn, row.playerId, setPickedOn)}
+                >
+                  <span className="shirt" style={{ borderColor: heatColor(row.deficitMs) }}>
+                    {p?.number || p?.name.slice(0, 2) || '?'}
+                  </span>
+                  <span className="tname">{p?.name ?? row.playerId}</span>
+                  <span className="ttime">{mmss(stats.get(row.playerId)?.playedMs ?? 0)}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
 
       {fillingSlot && (
         <Sheet

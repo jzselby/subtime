@@ -66,9 +66,16 @@ It works with no signal. Everything lives on the device.
 
 ### On the sideline
 
+**Nothing scrolls during a game.** The shell is locked to the viewport: header,
+clock, controls, pitch, bench, and action bar all fit on screen, and the pitch
+sizes itself to whatever room is left. Verified on iPhone SE through Pro Max, at
+7v7, 9v9, and 11v11 — see `scripts/checkfit.mjs` below.
+
 The game screen opens on the **field view**: your shape, with a shirt at every
-position showing number, name, and minutes played. A **List** toggle gives the
-same thing as sorted rows when you want the numbers instead.
+position showing number, name, and minutes played. The **☰** button in the header
+switches to a list when you want to scan the numbers. (On a small phone the pitch
+drops the name under each shirt and keeps the number and minutes — three lines of
+label per player is what makes rows collide.)
 
 - **Two taps to sub:** a player on the pitch, then a player on the bench strip
   underneath. Both take multiple selections, so a four-player change at a
@@ -120,6 +127,7 @@ npm run build --workspace app             # then, in another shell:
 npx vite preview --port 4173 --workspace app
 node scripts/smoke.mjs                    # drives a whole game in a real browser
 node scripts/resume.mjs                   # leaves mid-game and comes back
+node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
 `scripts/smoke.mjs` plays a full two-half game through the actual UI — roster,
@@ -131,6 +139,11 @@ screenshots to `scripts/shots/`. Pass `--headed` to watch either script.
 it starts a game, closes the tab entirely, waits, and reopens. Game time must
 have kept accruing across the gap — it is derived from timestamps, not ticked —
 and the app must land back on the live screen, still substitutable.
+
+`scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
+asserts the page does not scroll, the whole pitch is on screen, and **no two
+player tokens overlap**. That last check is the point: a squashed pitch still
+"fits" while being unusable, which a pure size assertion misses.
 
 The engine's own guarantee is documented in [`core/README.md`](./core/README.md):
 `Σ player minutes == ∫ onFieldCount dt`, verified two independent ways over

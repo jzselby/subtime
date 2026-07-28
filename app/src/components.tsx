@@ -9,6 +9,7 @@ export function Screen({
   action,
   children,
   footer,
+  fill,
 }: {
   title: string;
   subtitle?: string;
@@ -16,6 +17,12 @@ export function Screen({
   action?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  /**
+   * Lock the body to the viewport and let the content size itself to the space
+   * between header and footer, instead of scrolling. Used by the game screen,
+   * where scrolling to find a player mid-match is unacceptable.
+   */
+  fill?: boolean;
 }) {
   return (
     <div className="app">
@@ -31,7 +38,7 @@ export function Screen({
         </h1>
         {action}
       </header>
-      <main>{children}</main>
+      <main className={fill ? 'fill' : undefined}>{children}</main>
       {footer}
     </div>
   );

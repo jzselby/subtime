@@ -67,17 +67,28 @@ function codesFor(role: keyof typeof CODES, count: number): string[] {
  */
 export function buildFormation(name: string, lines: number[], gk = true): Formation {
   const slots: Slot[] = [];
-  if (gk) slots.push({ id: 'gk', code: 'GK', x: 0.5, y: 0.88 });
 
-  const BACK = 0.72;
-  const FRONT = 0.16;
+  /*
+   * Rows are spread evenly across the band *including* the keeper. Treating GK
+   * as a special case parked near the goal line left it far closer to the back
+   * line than the other rows were to each other, and on a small phone the
+   * keeper's shirt collided with the centre-back's.
+   *
+   * BACK stops short of 1.0 because a token's name and time render below the
+   * shirt and would otherwise be clipped by the touchline.
+   */
+  const BACK = 0.86;
+  const FRONT = 0.13;
+  const rows = lines.length + (gk ? 1 : 0);
+  const rowY = (i: number) =>
+    rows === 1 ? 0.5 : BACK - i * ((BACK - FRONT) / (rows - 1));
+
+  if (gk) slots.push({ id: 'gk', code: 'GK', x: 0.5, y: rowY(0) });
+
   const used = new Set<string>();
 
   lines.forEach((count, lineIndex) => {
-    const y =
-      lines.length === 1
-        ? 0.45
-        : BACK - lineIndex * ((BACK - FRONT) / (lines.length - 1));
+    const y = rowY(lineIndex + (gk ? 1 : 0));
     const codes = codesFor(roleFor(lineIndex, lines.length), count);
 
     for (let j = 0; j < count; j++) {

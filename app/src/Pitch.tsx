@@ -131,8 +131,12 @@ export function Pitch({
             ) : (
               <span className="tname muted">empty</span>
             )}
+            {/*
+              No position label on an occupied shirt: the code is already the
+              shirt's location on the pitch, and a third line of text is what
+              made tokens collide on a small phone.
+            */}
             {occupant && !compact && <span className="ttime">{mmss(occupant.playedMs)}</span>}
-            {!occupant || compact ? null : <span className="tcode">{slot.code}</span>}
           </button>
         );
       })}
