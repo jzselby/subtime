@@ -1216,3 +1216,30 @@ label.field > span {
 .bplayer {
   touch-action: none;
 }
+
+/* Attendance checklist: everyone ticked, untick who is away. */
+.check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 2px solid var(--line);
+  background: transparent;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.check.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06231a;
+}
+
+.btn.ghost.small {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}

@@ -118,11 +118,31 @@ await page.waitForSelector('text=Roster · 11');
 await page.click('text=+ New game');
 await page.fill('input[placeholder="Rovers"]', 'Northside');
 await page.click('text=Create game');
-await page.waitForSelector('text=Starting lineup');
-await shot(page, 'setup-empty');
+// Attendance now opens by itself on arrival, everyone ticked.
+await page.waitForSelector("text=Who's here?");
+check('attendance opens on arrival', await page.locator('.sheet .check.on').count(), ROSTER.length);
+await shot(page, 'setup-attendance');
 
 // One player is away; the other ten are available for seven shirts.
-await page.click('.chips >> text=Kit');
+await page.click('.sheet .prow:has-text("Kit")');
+await page.click('.sheet >> text=Done');
+
+/*
+ * Wait for the sheet to actually go, not for "Starting lineup" — that heading
+ * sits behind the sheet the whole time, so waiting on it returns instantly and
+ * reads the count before attendance has been written and folded back.
+ */
+await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
+await page.waitForFunction(
+  (n) => document.body.innerText.includes(`${n} here`),
+  `${ROSTER.length - 1} of ${ROSTER.length}`,
+);
+check(
+  'one player marked away',
+  await page.locator('button:has-text("here ›")').innerText(),
+  `${ROSTER.length - 1} of ${ROSTER.length} here ›`,
+);
+await shot(page, 'setup-empty');
 
 // Assign two by tapping the pitch, then let "Fill rest" do the remainder.
 for (let slot = 0; slot < 2; slot++) {

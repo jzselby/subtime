@@ -59,8 +59,13 @@ with no browser chrome eating the pitch.
 2. Add the roster.
 3. **Team → Settings → Formation** to choose a shape and drag positions where you
    actually play them. That's the default for new games.
-4. New game → mark who is here → tap positions on the pitch to fill them (or
+4. New game → a **Who's here?** checklist opens with the whole roster ticked;
+   untick anyone who's away → tap positions on the pitch to fill them (or
    **Fill rest**) → **Start**.
+
+Attendance is saved as you confirm it, so nipping into the formation editor and
+back doesn't lose it. Reopen the checklist any time from the **N of M here**
+button above the bench.
 
 **Tournaments and odd fixtures:** on a game's setup screen, **Setup** sets the
 periods, their length, and the formation **for that game only**. A Saturday of

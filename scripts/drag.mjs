@@ -64,6 +64,10 @@ await page.click('.sheet >> text=Close');
 await page.click('text=+ New game');
 await page.click('text=Create game');
 await page.waitForSelector('.pitch');
+// Attendance opens on arrival with everyone ticked; accept it as-is.
+await page.waitForSelector("text=Who's here?");
+await page.click('.sheet >> text=Done');
+await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
 await page.click('text=Fill rest');
 await page.waitForTimeout(200);
 await page.click('text=Start game');

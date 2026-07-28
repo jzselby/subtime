@@ -36,6 +36,10 @@ for (const [label, w, h] of DEVICES) {
   await p.click('.sheet >> text=Close');
   await p.click('text=+ New game'); await p.click('text=Create game');
   await p.waitForSelector('.pitch');
+    // Attendance opens on arrival with everyone ticked; accept it as-is.
+  await p.waitForSelector("text=Who's here?");
+  await p.click('.sheet >> text=Done');
+  await p.waitForSelector('.sheet-backdrop', { state: 'detached' });
   await p.click('text=Fill rest');
   await p.waitForTimeout(200);
   await p.click('text=Start game');

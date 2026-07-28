@@ -1,8 +1,8 @@
 import type { PlayerSlot } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Screen, Sheet } from '../components';
-import { db, deleteGame, type Game } from '../db';
+import { db, deleteGame, type Game, type Player } from '../db';
 import { useGameLog } from '../hooks';
 import type { Occupant } from '../Pitch';
 import { Pitch } from '../Pitch';
@@ -15,13 +15,13 @@ export function SetupScreen({ gameId }: { gameId: string }) {
     [game?.teamId],
   );
 
-  const [absent, setAbsent] = useState<Set<string>>(new Set());
   /** slot id → player id */
   const [lineup, setLineup] = useState<Record<string, string>>({});
   const [picking, setPicking] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
+  const [attendance, setAttendance] = useState(false);
 
-  const { recordMany } = useGameLog(gameId, game?.config ?? DEFAULT_CFG);
+  const { state, recordMany } = useGameLog(gameId, game?.config ?? DEFAULT_CFG);
 
   const roster = useMemo(
     () =>
@@ -45,6 +45,27 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       return Object.keys(next).length === Object.keys(l).length ? l : next;
     });
   }, [slotIds]);
+
+  /*
+   * Who is here is recorded as ATTENDANCE events the moment it is confirmed,
+   * not held in local state until kickoff. That is what lets it survive a trip
+   * into the formation editor and back, and it means the fairness targets are
+   * right before the first whistle rather than after it.
+   */
+  const attendanceKnown = state.attendance.size > 0;
+  const absent = useMemo(
+    () => new Set([...state.attendance].filter(([, v]) => v === 'absent').map(([id]) => id)),
+    [state.attendance],
+  );
+
+  // Ask on arrival, once, while nobody has been marked either way.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!asked.current && roster.length > 0 && !attendanceKnown) {
+      asked.current = true;
+      setAttendance(true);
+    }
+  }, [roster.length, attendanceKnown]);
 
   if (!game) return <Screen title="Loading…">{null}</Screen>;
 
@@ -79,14 +100,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       .filter((s) => lineup[s.id])
       .map((s) => ({ playerId: lineup[s.id] as string, position: s.code }));
 
-    await recordMany([
-      ...roster.map((p) => ({
-        type: 'ATTENDANCE' as const,
-        playerId: p.id,
-        status: absent.has(p.id) ? ('absent' as const) : ('present' as const),
-      })),
-      { type: 'SET_LINEUP' as const, slots },
-    ]);
+    await recordMany([{ type: 'SET_LINEUP' as const, slots }]);
     await db.games.update(gameId, { status: 'live' });
     navigate({ name: 'live', gameId }, true);
   };
@@ -117,34 +131,6 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         </div>
       }
     >
-      <h2>Who's here · {present.length} of {roster.length}</h2>
-      <div className="chipscroll">
-      <div className="chips">
-        {roster.map((p) => (
-          <button
-            key={p.id}
-            className={`chip${absent.has(p.id) ? '' : ' sel'}`}
-            onClick={() =>
-              setAbsent((prev) => {
-                const next = new Set(prev);
-                if (next.has(p.id)) next.delete(p.id);
-                else {
-                  next.add(p.id);
-                  // Dropping someone from attendance must drop them from the XI.
-                  setLineup((l) =>
-                    Object.fromEntries(Object.entries(l).filter(([, id]) => id !== p.id)),
-                  );
-                }
-                return next;
-              })
-            }
-          >
-            {p.number && <b>{p.number}</b>} {p.name}
-          </button>
-        ))}
-      </div>
-      </div>
-
       <h2>Starting lineup · {filled} of {needed}</h2>
       <div className="pitchwrap">
         <Pitch
@@ -154,6 +140,12 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         />
       </div>
 
+      <div className="row spread" style={{ marginTop: 2 }}>
+        <h2 style={{ margin: 0 }}>Bench · {present.length - filled}</h2>
+        <button className="btn ghost small" onClick={() => setAttendance(true)}>
+          {present.length} of {roster.length} here ›
+        </button>
+      </div>
       <div className="benchstrip">
         {present
           .filter((p) => !assigned.has(p.id))
@@ -167,6 +159,28 @@ export function SetupScreen({ gameId }: { gameId: string }) {
           <p className="small muted">Everyone available is in the lineup.</p>
         )}
       </div>
+
+      {attendance && (
+        <AttendanceSheet
+          roster={roster}
+          absent={absent}
+          onClose={() => setAttendance(false)}
+          onSave={async (nowAbsent) => {
+            await recordMany(
+              roster.map((p) => ({
+                type: 'ATTENDANCE' as const,
+                playerId: p.id,
+                status: nowAbsent.has(p.id) ? ('absent' as const) : ('present' as const),
+              })),
+            );
+            // Anyone marked absent cannot stay in the starting lineup.
+            setLineup((l) =>
+              Object.fromEntries(Object.entries(l).filter(([, id]) => !nowAbsent.has(id))),
+            );
+            setAttendance(false);
+          }}
+        />
+      )}
 
       {settings && (
         <MatchSettings game={game} gameId={gameId} onClose={() => setSettings(false)} />
@@ -216,6 +230,68 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         </Sheet>
       )}
     </Screen>
+  );
+}
+
+/**
+ * Who is here, as a checklist that starts with everybody ticked — the common
+ * case is a full squad, so the work is unticking the two who are away.
+ */
+function AttendanceSheet({
+  roster,
+  absent,
+  onClose,
+  onSave,
+}: {
+  roster: Player[];
+  absent: Set<string>;
+  onClose: () => void;
+  onSave: (absent: Set<string>) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<Set<string>>(() => new Set(absent));
+  const here = roster.length - draft.size;
+
+  const toggle = (id: string) =>
+    setDraft((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  return (
+    <Sheet title={`Who's here? · ${here} of ${roster.length}`} onClose={onClose}>
+      <p className="small muted" style={{ marginTop: -4 }}>
+        Everyone starts ticked. Untick anyone who is not at this game.
+      </p>
+      <div className="plist" style={{ marginTop: 10 }}>
+        {roster.map((p) => {
+          const isHere = !draft.has(p.id);
+          return (
+            <button
+              key={p.id}
+              className={`prow${isHere ? ' on' : ''}`}
+              onClick={() => toggle(p.id)}
+              aria-pressed={isHere}
+            >
+              <span className={`check${isHere ? ' on' : ''}`}>{isHere ? '✓' : ''}</span>
+              <span className="num-badge">{p.number || '–'}</span>
+              <span className="grow">
+                <span className={isHere ? 'name' : 'name muted'}>{p.name}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="row" style={{ marginTop: 12 }}>
+        <button className="btn" onClick={() => setDraft(new Set())}>
+          All here
+        </button>
+        <button className="btn primary grow" onClick={() => void onSave(draft)}>
+          Done
+        </button>
+      </div>
+    </Sheet>
   );
 }
 
