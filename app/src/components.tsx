@@ -1,6 +1,7 @@
 import { formatClock } from '@subtime/core';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export function Screen({
   title,
@@ -44,6 +45,14 @@ export function Screen({
   );
 }
 
+/*
+ * Sheets are counted rather than flagged. Swapping one sheet for another —
+ * picking a scorer from a goal sheet, say — mounts the new one before the old
+ * one unmounts, and a boolean would be cleared by the departing sheet and leave
+ * the page marked closed while a sheet is still up.
+ */
+let openSheets = 0;
+
 export function Sheet({
   title,
   onClose,
@@ -53,19 +62,39 @@ export function Sheet({
   onClose: () => void;
   children: ReactNode;
 }) {
-  // Escape closes, and the body must not scroll behind the sheet.
+  // Escape closes, and the page behind must not scroll.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  useEffect(() => {
+    openSheets += 1;
+    document.body.classList.add('sheet-open');
+    return () => {
+      openSheets -= 1;
+      if (openSheets === 0) document.body.classList.remove('sheet-open');
+    };
+  }, []);
+
+  /*
+   * Rendered into <body>, not into the screen that opened it.
+   *
+   * The header and the footer action bar are blurred (`backdrop-filter`), and
+   * WebKit promotes a blurred element to its own compositing layer that can
+   * paint above content with a higher z-index. A sheet nested inside <main>,
+   * between those two bars, lost to them on iOS: the Delete game button sat
+   * underneath Copy summary and Export CSV and could not be tapped, while
+   * Chromium sorted the same markup correctly and showed nothing wrong.
+   *
+   * A portal makes the sheet a sibling of the app shell rather than a
+   * descendant of a scroll container between two composited bars. `.sheet-open`
+   * on the body then takes those bars out of the running entirely — belt and
+   * braces, and invisible either way, since a bottom-anchored full-width sheet
+   * covers that strip regardless.
+   */
+  return createPortal(
     <div
       className="sheet-backdrop"
       onClick={onClose}
@@ -82,7 +111,8 @@ export function Sheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

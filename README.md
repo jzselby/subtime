@@ -168,6 +168,7 @@ node scripts/drag.mjs                     # drag-to-sub, as real pointer gesture
 node scripts/edit.mjs                     # correcting a recorded game
 node scripts/clock.mjs                    # the clock across a period boundary
 node scripts/export.mjs                   # download, share and email a CSV
+node scripts/sheets.mjs                   # nothing covers a sheet's buttons
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
@@ -202,6 +203,15 @@ to end — the file lands, and its header, row count and goal column are parsed
 back. Share and email hand off to the OS, so those are caught at the boundary:
 `navigator.share` is stubbed and its file and text inspected, and the `mailto:`
 navigation is intercepted and its subject and body read.
+
+`scripts/sheets.mjs` guards a bug that only appeared on iOS. The header and the
+footer action bar are blurred, WebKit promotes a blurred element to its own
+compositing layer, and that layer painted over a sheet rendered between them —
+so **Delete game** sat underneath *Copy summary* and *Export CSV* and could not
+be tapped. Chromium sorted the same markup correctly, which is why a screenshot
+proved nothing. Sheets now render through a portal into `<body>` and the blurred
+bars stand down while one is open; the test asserts both, and that every button
+in every sheet is the topmost element at its own centre.
 
 `scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
 asserts the page does not scroll, the whole pitch is on screen, and **no two

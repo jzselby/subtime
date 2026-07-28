@@ -510,10 +510,42 @@ label.field > span {
 
 /* ---------------------------------------------------------------- sheet -- */
 
+/*
+ * While a sheet is up, the two blurred bars step aside. Hiding them is never
+ * visible — a sheet is bottom-anchored and full width, so it already covers
+ * that strip — but it is the one fix that cannot be undone by a compositor
+ * deciding a blurred bar belongs on top. (The page itself never scrolls, so
+ * there is nothing to lock: `body` is already `overflow: hidden`.)
+ */
+body.sheet-open .actions,
+body.sheet-open .subbar {
+  visibility: hidden;
+}
+
+/*
+ * The header stays visible — a sheet rarely reaches it — but loses its blur,
+ * and with it the compositing promotion that let it climb over the sheet when a
+ * long one did reach that far.
+ */
+body.sheet-open .top,
+body.sheet-open .actions {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/*
+ * A sheet outranks everything, and says so twice.
+ *
+ * `will-change` forces the backdrop onto its own compositing layer. Without it,
+ * WebKit sorts the blurred header and footer — which get promoted whether they
+ * like it or not — against an unpromoted overlay, and the bars win despite the
+ * lower z-index.
+ */
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 100;
+  will-change: transform;
   display: flex;
   align-items: flex-end;
   justify-content: center;
