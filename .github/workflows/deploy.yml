@@ -30,7 +30,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # enablement turns Pages on via the API if it has never been configured,
+      # which it needs `pages: write` for. Without it the first run of this
+      # workflow fails with "Get Pages site failed … Not Found" until someone
+      # flips the switch by hand in Settings.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
