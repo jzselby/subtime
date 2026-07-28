@@ -1,8 +1,8 @@
 /**
  * Formations: named sets of position slots at coordinates on the pitch.
  *
- * Coordinates are normalised to 0..1 on a vertical pitch — (0.5, 0.93) is in
- * front of your own goal, (0.5, 0.1) is the opponent's. Normalised means the
+ * Coordinates are normalised to 0..1 on a vertical pitch — y near 1 is your own
+ * goal line, y near 0 is the opponent's. Normalised means the
  * same formation renders correctly at any screen size, and a dragged slot keeps
  * its meaning on a different phone.
  *
@@ -62,14 +62,6 @@ function bandFor(lineIndex: number, lineCount: number): keyof typeof CODES {
 const ROLE_OF: Record<string, Role> = { D: 'D', DM: 'M', M: 'M', AM: 'M', F: 'F' };
 
 /**
- * Per-line depth offsets, positive meaning deeper (toward our own goal).
- *
- * Real teams do not stand in flat rows: full-backs push up past the centre-backs,
- * a midfield three holds through the middle, and wingers play off the shoulder
- * of the striker. Small offsets, but they are the difference between a formation
- * diagram and a row of dots.
- */
-/**
  * How wide a line spreads, as the inset from each touchline.
  *
  * One number for every line was wrong in both directions: it pinned a strike
@@ -82,6 +74,14 @@ const MARGIN: Record<string, Record<number, number>> = {
   F: { 2: 0.34, 3: 0.17 },
 };
 
+/**
+ * Per-line depth offsets, positive meaning deeper (toward our own goal).
+ *
+ * Real teams do not stand in flat rows: full-backs push up past the centre-backs,
+ * a midfield three holds through the middle, and wingers play off the shoulder of
+ * the striker. Small offsets, but they are the difference between a formation and
+ * a row of dots.
+ */
 const STAGGER: Record<string, Record<number, number[]>> = {
   D: {
     3: [-0.015, 0.025, -0.015],
@@ -112,18 +112,14 @@ export function buildFormation(name: string, lines: number[], gk = true): Format
   const slots: Slot[] = [];
 
   /*
-   * Rows are spread evenly across the band *including* the keeper. Treating GK
-   * as a special case parked near the goal line left it far closer to the back
-   * line than the other rows were to each other, and on a small phone the
-   * keeper's shirt collided with the centre-back's.
+   * Rows spread evenly across this band, the keeper counted as one of them.
+   * Treating GK as a special case parked on the goal line left it far closer to
+   * the back line than the other rows were to each other, and on a small phone
+   * the keeper's shirt collided with the centre-back's.
    *
-   * BACK stops short of 1.0 because a token's name and time render below the
-   * shirt and would otherwise be clipped by the touchline.
-   */
-  /*
-   * The band rows are spread across. BACK sits deep enough that the keeper
-   * stands inside the penalty area rather than on its line, and short enough
-   * that the name and time under the shirt clear the touchline.
+   * BACK is deep enough that the keeper stands inside the penalty area rather
+   * than on its line, and short of 1.0 because a token's name and time render
+   * below the shirt and would otherwise be clipped by the touchline.
    */
   const BACK = 0.9;
   const FRONT = 0.14;
@@ -142,7 +138,6 @@ export function buildFormation(name: string, lines: number[], gk = true): Format
     const role = ROLE_OF[band] ?? 'M';
 
     const stagger = STAGGER[role]?.[count];
-
     const margin = MARGIN[role]?.[count] ?? (count > 3 ? 0.11 : 0.17);
 
     for (let j = 0; j < count; j++) {
