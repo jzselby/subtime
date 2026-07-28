@@ -77,7 +77,7 @@ check('first half counts up from zero', secs(firstHalf) >= 3 && secs(firstHalf) 
 check('period label reads 1H', (await page.locator('.gclock .meta').innerText()).startsWith('1H'), true);
 
 // -- end it, from the stop button rather than the ••• menu ------------------
-await page.click('[aria-label="End 1H"]');
+await page.click('[aria-label="End 1H"]', { delay: 800 });
 await page.waitForTimeout(400);
 const atBreak = await clock();
 console.log(`   at half time reads ${atBreak}`);

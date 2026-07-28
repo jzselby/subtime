@@ -197,9 +197,11 @@ export function Pitch({
             {occupant ? (
               <span className="tname">{occupant.name}</span>
             ) : (
-              // Empty slot reads as a team sheet entry: "ST · F".
+              // Empty slot reads as a team sheet entry: "ST · F". The keeper's
+              // code and role are both literally "GK", so pairing them would
+              // read as a stutter — just the one.
               <span className="tname vacantlabel">
-                {slot.code} · {slot.role}
+                {slot.role === 'GK' ? slot.code : `${slot.code} · ${slot.role}`}
               </span>
             )}
             {/*

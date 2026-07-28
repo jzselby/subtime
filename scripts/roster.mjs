@@ -137,11 +137,11 @@ check('and are not retired', await page.locator('text=Retired ·').count(), 0);
 // -- retiring a player who has played --------------------------------------
 await page.click('text=vs Rivals');
 await page.waitForSelector('.pitch');
-await page.click('[aria-label="End 1H"]');
+await page.click('[aria-label="End 1H"]', { delay: 800 });
 await page.waitForTimeout(300);
 await page.click('[aria-label="Start clock"]');
 await page.waitForTimeout(600);
-await page.click('[aria-label="End 2H"]');
+await page.click('[aria-label="End 2H"]', { delay: 800 });
 await page.waitForTimeout(500);
 await page.goto(URL);
 await page.click('text=Roster FC');

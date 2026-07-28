@@ -103,14 +103,25 @@ what makes rows collide.) The formation is captioned top-left.
   pitch first, then tap an empty position, to move them there.
 - **"ends 6:00 over"** under a name is a projection — where that player finishes
   if you change nothing — not a statement about right now.
-- **❚❚ pauses** for injuries and stoppages. Stopped time never counts as playing
-  time. **■ next to it ends the half** — the two things you do to a running clock
-  sit side by side, and neither is buried in a menu.
+- **Transport lives in the bottom bar**, in the thumb's reach: a big **Pause /
+  Resume**, coloured by state rather than by action — green while running,
+  amber while stopped — and a separate **hold-to-end** button beside it for the
+  half. A tap can't fire it by accident; hold it down and let go once you mean
+  it. While paused the pitch dims slightly and a **Paused** badge sits on it, so
+  "the clock isn't running" is obvious without reading the clock.
+- **Every sub, goal and card gets a toast** — "Kit Larsen on · Ana Selby off" —
+  because you're watching the field, not the phone, at the exact moment you make
+  the change. **Undo** now says what it will remove ("Undo sub", "Undo goal"),
+  not just "Undo".
+- **A sub that would leave the wrong number of players on the field says so**:
+  "Take Ana off — play 6" in a warning colour, instead of the same green as a
+  normal swap.
 - **The clock reads within the period**, next to `1H` / `2H` (or `Q1`…`Q4`). It
   is not a padded running total: a half you end at four minutes is four minutes,
   and the second half opens at 0:00. The whole-game figure — the sum of what was
-  actually played — is on the stats screen.
-- **Undo** removes the last event. Tapping the wrong name costs one tap to fix.
+  actually played — is on the stats screen. Run past the half's configured
+  length and the clock turns amber and shows the overrun (`+1:42`) instead of
+  counting on in silence.
 - **Modify events** (in the ••• menu) corrects anything already recorded — a goal
   given to the wrong player, a card on the wrong name, a substitution that never
   happened. Every number re-derives from the corrected log, so fixing it there

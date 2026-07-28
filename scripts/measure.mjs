@@ -65,12 +65,12 @@ const measured = await p.evaluate(() => {
   const out = {};
   for (const sel of [
     '[aria-label="Back"]', '[aria-label="Event log"]', '[aria-label="More"]',
-    '[aria-label="Pause clock"]', '.gstop', '.gclock .time', '.gclock .meta',
-    '.actions.slim .btn', '.benchgrid .bplayer', '.benchgrid .shirt',
-    '.token', '.token .shirt', '.pitch', '.gamebar', '.benchgrid', '.actions.slim',
+    '[aria-label="Pause clock"]', '.tstop', '.gclock .time', '.gclock .meta',
+    '.transport-row2 .btn', '.benchgrid .bplayer', '.benchgrid .shirt',
+    '.token', '.token .shirt', '.pitch', '.gamebar', '.benchgrid', '.actions.transport',
   ]) out[sel] = box(sel);
   // gaps between the three bottom action buttons
-  const acts = [...document.querySelectorAll('.actions.slim .btn')].map((e) => e.getBoundingClientRect());
+  const acts = [...document.querySelectorAll('.transport-row2 .btn')].map((e) => e.getBoundingClientRect());
   out.actionGap = acts.length > 1 ? +(acts[1].x - (acts[0].x + acts[0].width)).toFixed(1) : null;
   const bar = document.querySelector('.gamebar');
   const kids = [...bar.children].map((e) => {

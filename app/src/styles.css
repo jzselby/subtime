@@ -72,6 +72,7 @@ input,
 }
 
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   /* dvh tracks the real viewport when Safari's toolbars slide. */
@@ -164,7 +165,13 @@ main.fill {
   gap: 10px;
 }
 
-/* A scrollable region inside a filled screen — the list view, long rosters. */
+/*
+ * A scrollable region inside a filled screen — the live list view, long
+ * rosters. Padded directly rather than relying on a parent's padding: the
+ * live screen hand-rolls its own shell instead of using `main`, so without
+ * this the section headings sat flush against the bezel and the last row was
+ * sliced in half by the action bar underneath it.
+ */
 .pane {
   flex: 1;
   min-height: 0;
@@ -173,6 +180,7 @@ main.fill {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  padding: var(--pad) var(--pad) calc(var(--pad) + 10px);
 }
 
 /* ----------------------------------------------------------------- bits -- */
@@ -901,9 +909,15 @@ body.sheet-open .actions {
  * shirt number is how a coach identifies a player at a glance, and minutes are
  * the reason to look at all — the name is what goes. It is still on the bench
  * strip and throughout the list view.
+ *
+ * Scoped to occupied tokens only. `.vacantlabel` is a `.tname` too, but on an
+ * empty slot the position code is not decoration — it is the only thing that
+ * says which slot this is. Dropping it on the setup pitch on a small phone
+ * (it measures well under 360px there) left nine identical dashed circles with
+ * no way to tell the keeper from a striker without tapping each one.
  */
 @container (max-height: 360px) {
-  .token .tname {
+  .token:not(.vacant) .tname {
     display: none;
   }
 }
@@ -1126,29 +1140,6 @@ body.sheet-open .actions {
   font-variant-numeric: tabular-nums;
 }
 
-.gplay {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #06231a;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.gplay.on {
-  background: var(--warn);
-  color: #2a1c02;
-}
-
-.gplay:disabled {
-  opacity: 0.35;
-}
-
 /* Full-bleed pitch: no card, no gutters, edge to edge. */
 .pitchwrap.bleed {
   padding: 0;
@@ -1179,16 +1170,6 @@ body.sheet-open .actions {
   max-height: 27vh;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-
-.actions.slim {
-  padding: 6px 10px calc(env(safe-area-inset-bottom) + 6px);
-  gap: 6px;
-}
-
-.actions.slim .btn {
-  min-height: 42px;
-  font-size: 14px;
 }
 
 .subbar {
@@ -1299,28 +1280,235 @@ body.sheet-open .actions {
   font-variant-numeric: tabular-nums;
 }
 
-/* End-period button, beside the transport. Square, and visually quieter than
-   play — it is the destructive one of the pair. */
-.gstop {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border: 2px solid var(--line);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
+/* ------------------------------------------------------ live transport -- */
+
+/*
+ * Pause/resume and end-half live in the bottom action bar, not the top strip.
+ * Measured on an iPhone SE: the old top-bar controls sat at y=7-10, the least
+ * reachable point on the phone one-handed, sized 44px and 38px with a 4px gap
+ * between "pause" (recoverable) and "end the half" (a period boundary) — while
+ * the actual thumb zone below was spent on goals, which happen a handful of
+ * times a game next to a control that gates every playing-time number the app
+ * produces.
+ */
+.actions.transport {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px var(--pad) calc(env(safe-area-inset-bottom) + 8px);
+  /*
+   * Solid, not blurred. `backdrop-filter` forces this bar onto its own
+   * compositing layer, and the confirmation toast — which needs to float
+   * above it while it fires — was found sampling into that layer instead of
+   * painting over it: a fully opaque, correctly z-indexed toast simply did
+   * not appear on screen. Same root cause as the sheet-over-blurred-bar bug
+   * fixed earlier; the fix there was turning the blur off, and it is here too.
+   */
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.transport-row {
+  display: flex;
+  align-items: stretch;
+  /* Real separation, not 4px: a mis-tap cannot land on both. */
+  gap: 20px;
+}
+
+.tplay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 56px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.gstop:active:not(:disabled) {
-  background: var(--surface-2);
-  color: var(--danger);
-  border-color: var(--danger);
+.tplay .ticon {
+  font-size: 19px;
+  line-height: 1;
 }
 
-.gstop:disabled {
+/*
+ * State, not action, carries the colour. The button used to flip amber while
+ * running and green while paused — the loudest object on the screen agreeing
+ * with neither a stopwatch nor the clock digits beside it, which were already
+ * amber while paused. Running is now the calm, correct colour; paused is the
+ * one built to catch the eye, because minutes have stopped counting and that
+ * may not be what the coach meant.
+ */
+.tplay.running {
+  background: var(--accent);
+  color: #06231a;
+}
+
+.tplay.paused {
+  background: var(--warn);
+  color: #2a1c02;
+}
+
+.tplay:disabled {
+  opacity: 0.4;
+}
+
+/*
+ * Press-and-hold rather than tap-and-confirm. A native confirm() dialog's
+ * default button is the destructive one, and it is dismissed by the same
+ * reflexive tap that opened it — no defence at all against the mis-tap this
+ * button sits 20px from. A hold cannot be produced by accident, and the
+ * darkening fill during it is the guard made visible, not decoration.
+ */
+.hold {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  transition:
+    background-color 550ms linear,
+    border-color 550ms linear,
+    color 550ms linear;
+}
+
+.tstop {
+  flex: none;
+  width: 56px;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tstop .ticon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tstop .tsub {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tstop.holding {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.tstop:disabled {
   opacity: 0.3;
+}
+
+/* The same hold guard, applied to the equivalent control inside the ••• menu. */
+.btn.warn.holding {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.transport-row2 {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+
+.transport-row2 .btn {
+  min-height: 44px;
+  font-size: 14px;
+  padding: 0 6px;
+}
+
+/*
+ * "That registered." A completed sub, goal or card used to produce nothing
+ * more than two tokens swapping regions of the screen — no toast, no haptic,
+ * no sound — while the coach was looking at the field, not the phone, at
+ * exactly the moment they made the change.
+ */
+/*
+ * Floats in the pitch, clear of the bottom bar rather than pinned to the very
+ * bottom of it: the transport row runs to roughly 130px including the safe
+ * area, and a toast sitting inside that band read as part of the button row
+ * instead of a message about what just happened.
+ */
+.toastwrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 156px;
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  padding: 0 var(--pad);
+}
+
+.toast {
+  max-width: 100%;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(15, 23, 32, 0.92);
+  border: 1px solid var(--accent-dim);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  animation: toastin 2200ms ease forwards;
+}
+
+@keyframes toastin {
+  0% { opacity: 0; transform: translateY(6px); }
+  8% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* The clock has run past the half's configured length with nothing said about
+   it before now — same treatment as paused, since both mean "pay attention". */
+.gclock .time.overrun {
+  color: var(--warn);
+}
+
+/*
+ * A quiet, reversible cue that the clock is not running: the pitch dims a
+ * little rather than disappearing under a dark scrim, because a coach setting
+ * up subs while paused still needs to read shirt numbers accurately.
+ */
+.pitchwrap.paused .pitch {
+  filter: saturate(0.55) brightness(0.78);
+  transition: filter 200ms ease;
+}
+
+.pausebadge {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--warn);
+  color: #2a1c02;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
 }

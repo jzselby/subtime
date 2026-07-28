@@ -177,7 +177,27 @@ check('clock is advancing', /0:0[1-9]/.test(clockText), true);
 check('field view is the default', await page.locator('.pitch').count(), 1);
 const benchName = await page.locator('.benchgrid .bplayer .tname >> nth=0').innerText();
 await page.click('.token:not(.vacant) >> nth=0');
+
+/*
+ * Taking a player off with nobody picked to replace them used to read "Sub 1
+ * ↔ 0" in the same green as a straight swap, and tapping it quietly played
+ * the team a man short. The label now states the outcome, and the button
+ * warns rather than inviting the tap.
+ */
+check(
+  'an uneven sub states the consequence, not the arithmetic',
+  await page.locator('.subbar >> text=/^Take .+ off — play \\d$/').count(),
+  1,
+);
+check('an uneven sub is styled as a warning, not primary', await page.locator('.subbar .warn').count(), 1);
+
 await page.click('.benchgrid .bplayer >> nth=0');
+check(
+  'picking a replacement returns to a plain swap label',
+  await page.locator('text=/^Sub 1 ↔ 1$/').count(),
+  1,
+);
+check('a straight swap is not styled as a warning', await page.locator('.subbar .warn').count(), 0);
 await shot(page, 'live-sub-pending');
 await page.click('text=/^Sub 1 ↔ 1$/');
 await page.waitForTimeout(400);
@@ -245,7 +265,7 @@ await page.click('.sheet >> text=Close');
 // -- run out both halves ---------------------------------------------------
 page.on('dialog', (d) => d.accept());
 await page.click('[aria-label="More"]');
-await page.click('.sheet >> text=End 1H');
+await page.click('.sheet >> text=End 1H', { delay: 800 });
 await page.waitForTimeout(300);
 await page.click('[aria-label="Start clock"]');
 await page.waitForTimeout(1500);
@@ -257,7 +277,7 @@ await page.click('text=/^Sub 1 ↔ 1$/');
 await page.waitForTimeout(1200);
 
 await page.click('[aria-label="More"]');
-await page.click('.sheet >> text=End 2H');
+await page.click('.sheet >> text=End 2H', { delay: 800 });
 await page.waitForTimeout(300);
 await shot(page, 'live-fulltime');
 

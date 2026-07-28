@@ -146,7 +146,7 @@ for (const [tag, w, h] of DEVICES) {
   // end half
   p.on('dialog', (d) => d.accept());
   await p.click('[aria-label="More"]');
-  await p.click('.sheet >> text=End 1H');
+  await p.click('.sheet >> text=End 1H', { delay: 800 });
   await p.waitForTimeout(400);
   await shot('26-halftime');
   await p.click('[aria-label="Start clock"]');
@@ -156,7 +156,7 @@ for (const [tag, w, h] of DEVICES) {
   await p.click('text=/^Sub 1 ↔ 1$/');
   await p.waitForTimeout(1400);
   await p.click('[aria-label="More"]');
-  await p.click('.sheet >> text=End 2H');
+  await p.click('.sheet >> text=End 2H', { delay: 800 });
   await p.waitForTimeout(500);
   await shot('27-fulltime');
 

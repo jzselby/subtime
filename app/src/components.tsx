@@ -1,6 +1,6 @@
 import { formatClock } from '@subtime/core';
-import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export function Screen({
@@ -136,6 +136,17 @@ export const periodTag = (periods: number, period: number): string => {
 export const mins = (ms: number): number => Math.round(ms / 60_000);
 
 /**
+ * A period-length field held as text while it's being typed, clamped on commit.
+ *
+ * Clamping on every keystroke — `Math.max(1, Number(value))` in an `onChange`
+ * — turns a momentarily empty field into `1`: clearing "30" to type "25" leaves
+ * "1", then "1" + "2" + "5" reads "125" before the coach has finished typing.
+ * Below one minute is nonsense for a half, so it still floors at one, just not
+ * mid-keystroke.
+ */
+export const minutesOf = (raw: string): number => Math.max(1, Math.round(Number(raw)) || 1);
+
+/**
  * Colour for a player's fairness deficit: warm when they are owed time, cool
  * when they have had more than their share. The point is that a coach can scan
  * the list without reading a single number.
@@ -233,10 +244,146 @@ export function PlayerRow({
   );
 }
 
-/** Short WebAudio blip for the shift alarm. */
+/**
+ * A short line confirming what just happened, in the band above the action bar.
+ *
+ * The coach is looking at the field, not the phone, at exactly the moment they
+ * make a sub — the interaction is tap, tap, tap, look up. Without this the only
+ * evidence a sub registered is two tokens changing places in two different
+ * regions of the screen, so a mis-tap fails silently and is discovered later, in
+ * the playing-time numbers, when it is expensive to fix.
+ *
+ * The live region is always mounted, empty or not: a region added to the DOM at
+ * the same moment as its text is not reliably announced.
+ */
+export function useToast(): { notify: (text: string) => void; toast: ReactNode } {
+  const [msg, setMsg] = useState<{ text: string; key: number } | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+
+  const notify = useCallback((text: string) => {
+    window.clearTimeout(timer.current);
+    setMsg({ text, key: Date.now() });
+    timer.current = window.setTimeout(() => setMsg(null), 2200);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const toast = (
+    <div className="toastwrap" role="status" aria-live="polite">
+      {msg && (
+        <span className="toast" key={msg.key}>
+          {msg.text}
+        </span>
+      )}
+    </div>
+  );
+  return { notify, toast };
+}
+
+/**
+ * Press and hold to fire. For actions with a real cost and no undo.
+ *
+ * A native `confirm()` is a poor guard on a touchline: its default button is the
+ * dangerous one, and it is dismissed by the same reflexive tap that opened it. A
+ * hold cannot be produced by a mis-tap at all, and the fill shows the commitment
+ * building, so letting go early is an obvious escape.
+ */
+export function HoldButton({
+  onHold,
+  disabled,
+  className = '',
+  holdMs = 700,
+  children,
+  ...rest
+}: {
+  onHold: () => void;
+  disabled?: boolean;
+  className?: string;
+  holdMs?: number;
+  children: ReactNode;
+  'aria-label'?: string;
+}) {
+  const [holding, setHolding] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+
+  const stop = () => {
+    window.clearTimeout(timer.current);
+    setHolding(false);
+  };
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  return (
+    <button
+      {...rest}
+      type="button"
+      className={`hold${holding ? ' holding' : ''} ${className}`}
+      style={{ '--hold-ms': `${holdMs}ms` } as CSSProperties}
+      disabled={disabled}
+      onPointerDown={(e) => {
+        if (disabled) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setHolding(true);
+        const downX = e.clientX;
+        const downY = e.clientY;
+        timer.current = window.setTimeout(() => {
+          stop();
+          /*
+           * onHold fires while the finger is still physically down — that is
+           * what "hold" means — and it typically unmounts this button (the
+           * caller closes a sheet, the screen changes). Pointer capture does
+           * not survive the captured element leaving the DOM, so the eventual
+           * lift-off is delivered fresh, by normal hit-testing, to whatever is
+           * now on screen at that same point. Observed for real: ending a
+           * half from this button in a sheet let the release land on a player
+           * token on the pitch underneath and silently selected them.
+           *
+           * A capture-phase listener for the next release swallows exactly
+           * that stray event — the same "the gesture is not over yet" guard
+           * this codebase already uses for drag-vs-tap collisions, generalised
+           * to survive the target disappearing mid-gesture. It is scoped to
+           * the original touch point, not "the next release anywhere": a coach
+           * who immediately taps a *different* control — Start, right after
+           * Hold to end — means that tap, and an unscoped swallow ate it.
+           */
+          const NEAR = 16;
+          const near = (ev: PointerEvent | MouseEvent) =>
+            Math.hypot(ev.clientX - downX, ev.clientY - downY) < NEAR;
+          const swallow = (ev: Event) => {
+            if (!near(ev as PointerEvent)) return;
+            ev.stopPropagation();
+            ev.preventDefault();
+            cleanup();
+          };
+          const cleanup = () => {
+            window.removeEventListener('pointerup', swallow, { capture: true });
+            window.removeEventListener('click', swallow, { capture: true });
+          };
+          window.addEventListener('pointerup', swallow, { capture: true });
+          window.addEventListener('click', swallow, { capture: true });
+          window.setTimeout(cleanup, 2000);
+          onHold();
+        }, holdMs);
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onPointerLeave={stop}
+      /* Keyboard users get a plain activation; a hold is a pointer affordance. */
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (!disabled) onHold();
+        }
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Short WebAudio blip: the shift alarm, and the confirmation of an action. */
 let audioCtx: AudioContext | null = null;
 
-export function beep(times = 1): void {
+export function beep(times = 1, freq = 880): void {
   try {
     const Ctor = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
@@ -248,7 +395,7 @@ export function beep(times = 1): void {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       const start = audioCtx.currentTime + i * 0.22;
-      osc.frequency.value = 880;
+      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.0001, start);
       gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
@@ -258,5 +405,22 @@ export function beep(times = 1): void {
     }
   } catch {
     // Audio is a convenience; never let it break the game screen.
+  }
+}
+
+/**
+ * "That registered" — a lower, single blip, deliberately unlike the two-note
+ * shift alarm so the two are not confused while looking at the field.
+ *
+ * `navigator.vibrate` is not implemented in iOS Safari, so on the phone this
+ * app is built for the haptic silently does nothing and the blip is the signal
+ * that actually lands. It costs nothing to fire for the platforms that do.
+ */
+export function confirmCue(): void {
+  beep(1, 620);
+  try {
+    navigator.vibrate?.(18);
+  } catch {
+    // Vibration is gated by user-activation rules on some platforms.
   }
 }

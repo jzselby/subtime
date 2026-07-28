@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
-import { Screen, Sheet } from '../components';
+import { minutesOf, Screen, Sheet } from '../components';
 import {
   createGame,
   db,
@@ -277,14 +277,14 @@ function NewGameSheet({ team, onClose }: { team: Team; onClose: () => void }) {
  */
 function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
   const [periods, setPeriods] = useState(team.config.periods.count);
-  const [lengthMin, setLengthMin] = useState(Math.round(team.config.periods.lengthMs / 60_000));
+  const [lengthMin, setLengthMin] = useState(String(Math.round(team.config.periods.lengthMs / 60_000)));
   const [gkWeight, setGkWeight] = useState(team.config.fairness.gkWeight);
 
   const save = async () => {
     await db.teams.update(team.id, {
       config: {
         ...team.config,
-        periods: { ...team.config.periods, count: periods, lengthMs: lengthMin * 60_000 },
+        periods: { ...team.config.periods, count: periods, lengthMs: minutesOf(lengthMin) * 60_000 },
         fairness: { ...team.config.fairness, gkWeight },
       },
     });
@@ -306,11 +306,15 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
           </label>
           <label className="field grow">
             <span>Minutes each</span>
+            {/* Held as text while editing. Clamping on every keystroke turned an
+                empty field into "1", so clearing 30 to type 25 left you with 125
+                and no way to reach a number below ten. Clamp on commit. */}
             <input
               type="number"
               min={1}
               value={lengthMin}
-              onChange={(e) => setLengthMin(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => setLengthMin(e.target.value)}
+              onBlur={() => setLengthMin(String(minutesOf(lengthMin)))}
               inputMode="numeric"
             />
           </label>

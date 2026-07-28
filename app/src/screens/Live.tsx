@@ -2,7 +2,17 @@ import type { GameEvent, PlayerSlot } from '@subtime/core';
 import { clockAt, fairness, formatClock, playerStats } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { beep, heatColor, mmss, periodTag, PlayerRow, Sheet } from '../components';
+import {
+  beep,
+  confirmCue,
+  heatColor,
+  HoldButton,
+  mmss,
+  periodTag,
+  PlayerRow,
+  Sheet,
+  useToast,
+} from '../components';
 import { db, deleteGame } from '../db';
 import { describeEvent } from '../describe';
 import { codesOf } from '../formations';
@@ -106,6 +116,43 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     }
     return last;
   }, [events, state.period]);
+
+  /*
+   * Confirmation is driven off the log rather than the call sites, so anything
+   * that records an event confirms itself — a tap, a drag, a sheet, a swap —
+   * and a new kind of action cannot be added without one. It also means the
+   * wording is the same as the event log's, so a toast and the log agree.
+   *
+   * Only growth speaks. A shrink is an undo, which announces itself from the
+   * button with the description of what it removed.
+   */
+  const { notify, toast } = useToast();
+  const seen = useRef(-1);
+  useEffect(() => {
+    const count = events.length;
+    const before = seen.current;
+    seen.current = count;
+    // The first fold is the game loading, not something the coach just did.
+    if (before < 0 || count <= before) return;
+    const e = events[count - 1];
+    if (!e) return;
+    notify(describeEvent(e, nameOf));
+    /*
+     * Silent for the four that already have their own unmissable signal: a
+     * position change is a drag the coach is watching, and pause/resume/end
+     * are the transport button itself flipping colour under their thumb.
+     * Everything else — a sub, a goal, a card — happens while the coach is
+     * looking at the field, not the phone, and needs a sound to reach them.
+     */
+    const silent: GameEvent['type'][] = [
+      'POSITION_CHANGE',
+      'CLOCK_PAUSE',
+      'CLOCK_RESUME',
+      'PERIOD_START',
+      'PERIOD_END',
+    ];
+    if (!silent.includes(e.type)) confirmCue();
+  }, [events, nameOf, notify]);
 
   const shiftMs = Math.max(60_000, Math.round(config.periods.lengthMs / 4));
   const shiftDue = running && clock - lastSubClock >= shiftMs;
@@ -246,6 +293,16 @@ export function LiveScreen({ gameId }: { gameId: string }) {
 
   const hasSelection = pickedOff.size > 0 || pickedOn.size > 0;
   const canPlay = state.status !== 'final';
+  const inPeriod = state.status === 'running' || state.status === 'paused';
+
+  /*
+   * The app is told the half length at setup and then never used it for anything
+   * the coach could see: the clock counted serenely past full time in the same
+   * white as a clock at 0:30. In youth soccer the coach is often the timekeeper,
+   * and is always the one who needs the last rotation to land before the whistle.
+   */
+  const overrunMs = inPeriod ? clock - config.periods.lengthMs : 0;
+  const overrun = overrunMs > 0;
 
   const transport = () => {
     if (state.status === 'running') void record({ type: 'CLOCK_PAUSE' });
@@ -254,10 +311,74 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       void record({ type: 'PERIOD_START' });
   };
 
+  const transportLabel =
+    state.status === 'running'
+      ? 'Pause'
+      : state.status === 'paused'
+        ? 'Resume'
+        : state.status === 'break'
+          ? `Start ${periodTag(config.periods.count, state.period + 1)}`
+          : state.status === 'pregame'
+            ? 'Start'
+            : 'Full time';
+
+  const undoLast = () => {
+    const last = events[events.length - 1];
+    const what = last ? describeEvent(last, nameOf) : '';
+    void undo().then(() => {
+      notify(what ? `Undid — ${what}` : 'Undone');
+      confirmCue();
+    });
+  };
+
+  /*
+   * "↩ Undo" sits at the single easiest thumb target on the phone and used to
+   * say nothing about what it would remove — a coach who suspected a tap had
+   * not registered had every reason to tap it again "to be sure", and a bare
+   * label gave them no way to tell that would remove two events instead of
+   * confirming one. Naming the target is the cheaper fix; the toast above
+   * confirms what actually happened once it has.
+   */
+  const undoNoun: Partial<Record<GameEvent['type'], string>> = {
+    SUB: 'sub',
+    GOAL: 'goal',
+    OPPONENT_GOAL: 'goal',
+    POSITION_CHANGE: 'move',
+    CARD: 'card',
+    PERIOD_START: 'start',
+    PERIOD_END: 'end',
+    CLOCK_PAUSE: 'pause',
+    CLOCK_RESUME: 'resume',
+  };
+  const lastEvent = events[events.length - 1];
+  const undoLabel = lastEvent
+    ? `↩ Undo ${undoNoun[lastEvent.type] ?? lastEvent.type.toLowerCase()}`
+    : '↩ Undo';
+
+  /*
+   * The sub button used to read "Sub 1 ↔ 0" in full primary green and, tapped,
+   * would quietly play the team a man short. The arithmetic was the label; the
+   * consequence was invisible. Now the button says what will be true afterwards,
+   * and anything that leaves the wrong number on the field is a warning rather
+   * than the same green as a straight swap.
+   */
+  const resultingOnField = state.onField.size - pickedOff.size + pickedOn.size;
+  const wrongCount = resultingOnField !== config.periods.fieldPlayers;
+  const listNames = (ids: Iterable<string>) => {
+    const all = [...ids].map((id) => nameOf(id)?.name ?? '?');
+    return all.length <= 2 ? all.join(' and ') : `${all.length} players`;
+  };
+  const subLabel =
+    pickedOn.size === 0
+      ? `Take ${listNames(pickedOff)} off — play ${resultingOnField}`
+      : pickedOff.size === 0
+        ? `Put ${listNames(pickedOn)} on — play ${resultingOnField}`
+        : `Sub ${pickedOff.size} ↔ ${pickedOn.size}${wrongCount ? ` — play ${resultingOnField}` : ''}`;
+
   return (
     <div className="app">
-      {/* One strip for clock, score and transport — the whole of the old
-          header, clock card and period-control rows in ~64px. */}
+      {/* Clock and score live in one thin strip; transport moved to the bottom
+          bar, in the thumb's reach, rather than sharing this row with it. */}
       <header className="gamebar">
         <button
           className="gbtn"
@@ -271,34 +392,17 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         </button>
 
         <div className="gclock">
-          <span className={`time${state.status === 'paused' ? ' paused' : ''}`}>
+          <span
+            className={`time${state.status === 'paused' ? ' paused' : overrun ? ' overrun' : ''}`}
+          >
             {formatClock(clock)}
           </span>
           <span className="meta">
-            {statusLabel} · {state.score.us}–{state.score.them}
+            {statusLabel}
+            {overrun && ` · +${formatClock(overrunMs)}`} · {state.score.us}–{state.score.them}
           </span>
         </div>
 
-        <button
-          className={`gplay${running ? ' on' : ''}`}
-          onClick={transport}
-          disabled={!canPlay}
-          aria-label={running ? 'Pause clock' : 'Start clock'}
-        >
-          {running ? '❚❚' : '▶'}
-        </button>
-        {/* Ending a half is twice-a-game, but it was buried in the ••• menu
-            while the thing next to it — pausing — is a single tap. */}
-        <button
-          className="gstop"
-          onClick={() => {
-            if (confirm(`End ${periodLabel}?`)) void record({ type: 'PERIOD_END' });
-          }}
-          disabled={state.status !== 'running' && state.status !== 'paused'}
-          aria-label={`End ${periodLabel}`}
-        >
-          ■
-        </button>
         <button className="gbtn" onClick={() => setSheet('menu')} aria-label="More">
           •••
         </button>
@@ -312,7 +416,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       )}
 
       {view === 'field' ? (
-        <div className="pitchwrap bleed">
+        <div className={`pitchwrap bleed${state.status === 'paused' ? ' paused' : ''}`}>
           <Pitch
             formation={formation}
             occupants={occupants}
@@ -334,6 +438,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           >
             <span className="fname">{formation.name}</span>
             {shiftDue && <span className="shiftpill">Shift due</span>}
+            {state.status === 'paused' && <span className="pausebadge">⏸ Paused</span>}
           </Pitch>
         </div>
       ) : (
@@ -408,6 +513,8 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         </div>
       )}
 
+      {toast}
+
       {hasSelection ? (
         <div className="subbar">
           <div className="row">
@@ -420,26 +527,62 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             >
               Cancel
             </button>
-            <button className="btn primary grow" onClick={() => void makeSub()}>
-              Sub {pickedOff.size} ↔ {pickedOn.size}
+            <button
+              className={`btn grow${wrongCount ? ' warn' : ' primary'}`}
+              onClick={() => void makeSub()}
+            >
+              {subLabel}
             </button>
           </div>
         </div>
       ) : (
-        <div className="actions slim">
-          <button className="btn" onClick={() => setSheet('goal')} disabled={state.period === 0}>
-            ⚽ Us
-          </button>
-          <button
-            className="btn"
-            onClick={() => void record({ type: 'OPPONENT_GOAL' })}
-            disabled={state.period === 0}
-          >
-            ⚽ Them
-          </button>
-          <button className="btn" onClick={() => void undo()} disabled={events.length === 0}>
-            ↩ Undo
-          </button>
+        <div className="actions transport">
+          {/*
+           * Pause/resume and end-half used to live in the top strip: 44px and
+           * 38px targets, 4px apart, in the least reachable spot on the phone
+           * one-handed — while the bottom bar, the actual thumb zone, spent
+           * its space on goals, which happen a handful of times a game next
+           * to a control that gates every playing-time number the app
+           * produces. They live here now, full-sized, with real separation.
+           */}
+          <div className="transport-row">
+            <button
+              className={`tplay${running ? ' running' : state.status === 'paused' ? ' paused' : ''}`}
+              onClick={transport}
+              disabled={!canPlay}
+              aria-label={running ? 'Pause clock' : 'Start clock'}
+            >
+              <span className="ticon">{running ? '❚❚' : '▶'}</span>
+              {transportLabel}
+            </button>
+            {/* A hold cannot be produced by the mis-tap that a native confirm()
+                dialog was defenseless against, so the fill itself is the guard —
+                nothing else is needed next to the button that pauses the clock. */}
+            <HoldButton
+              className="tstop"
+              onHold={() => void record({ type: 'PERIOD_END' })}
+              disabled={!inPeriod}
+              aria-label={`End ${periodLabel}`}
+            >
+              <span className="ticon">■</span>
+              <span className="tsub">hold</span>
+            </HoldButton>
+          </div>
+          <div className="transport-row2">
+            <button className="btn" onClick={() => setSheet('goal')} disabled={state.period === 0}>
+              ⚽ Us
+            </button>
+            <button
+              className="btn"
+              onClick={() => void record({ type: 'OPPONENT_GOAL' })}
+              disabled={state.period === 0}
+            >
+              ⚽ Them
+            </button>
+            <button className="btn" onClick={undoLast} disabled={events.length === 0}>
+              {undoLabel}
+            </button>
+          </div>
         </div>
       )}
 
@@ -455,16 +598,16 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             <p className="small muted">
               {formation.name} · {config.periods.count} × {Math.round(config.periods.lengthMs / 60_000)} min
             </p>
-            {(state.status === 'running' || state.status === 'paused') && (
-              <button
+            {inPeriod && (
+              <HoldButton
                 className="btn warn block"
-                onClick={() => {
+                onHold={() => {
                   setSheet(null);
-                  if (confirm(`End ${periodLabel}?`)) void record({ type: 'PERIOD_END' });
+                  void record({ type: 'PERIOD_END' });
                 }}
               >
-                End {periodLabel} (or ■ in the bar)
-              </button>
+                Hold to end {periodLabel} (or ■ in the bar)
+              </HoldButton>
             )}
             <button
               className="btn block"

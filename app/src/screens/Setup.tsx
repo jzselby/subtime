@@ -1,7 +1,7 @@
 import type { PlayerSlot } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Screen, Sheet } from '../components';
+import { minutesOf, Screen, Sheet } from '../components';
 import { db, deleteGame, type Game, type Player } from '../db';
 import { useGameLog } from '../hooks';
 import type { Occupant } from '../Pitch';
@@ -158,15 +158,27 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       }
       footer={
         <div className="actions">
-          <button className="btn" disabled={filled >= needed} onClick={autoFill}>
+          {/*
+           * The one-tap action that solves this whole screen used to be the
+           * quiet grey button, while the loudest, greenest element was a
+           * disabled restatement of the heading above it ("Pick 9 more") —
+           * readable at about 2:1 contrast and not a control at all. Fill rest
+           * is now what the eye lands on; Start game is a stable target that
+           * says the same thing throughout instead of counting down.
+           */}
+          <button
+            className={`btn${filled < needed ? ' primary' : ''}`}
+            disabled={filled >= needed}
+            onClick={autoFill}
+          >
             Fill rest
           </button>
           <button
-            className="btn primary lg"
+            className={`btn lg${filled >= needed && needed > 0 ? ' primary' : ''}`}
             disabled={filled < needed || needed === 0}
             onClick={() => void start()}
           >
-            {filled < needed ? `Pick ${needed - filled} more` : 'Start game'}
+            Start game
           </button>
         </div>
       }
@@ -370,7 +382,7 @@ function MatchSettings({
   onClose: () => void;
 }) {
   const [periods, setPeriods] = useState(game.config.periods.count);
-  const [lengthMin, setLengthMin] = useState(Math.round(game.config.periods.lengthMs / 60_000));
+  const [lengthMin, setLengthMin] = useState(String(Math.round(game.config.periods.lengthMs / 60_000)));
   const [opponent, setOpponent] = useState(game.opponent);
 
   const save = async () => {
@@ -378,7 +390,7 @@ function MatchSettings({
       opponent: opponent.trim(),
       config: {
         ...game.config,
-        periods: { ...game.config.periods, count: periods, lengthMs: lengthMin * 60_000 },
+        periods: { ...game.config.periods, count: periods, lengthMs: minutesOf(lengthMin) * 60_000 },
       },
     });
     onClose();
@@ -404,11 +416,15 @@ function MatchSettings({
           </label>
           <label className="field grow">
             <span>Minutes each</span>
+            {/* Held as text while editing. Clamping on every keystroke turned an
+                empty field into "1", so clearing 30 to type 25 left you with 125
+                and no way to reach a number below ten. Clamp on commit. */}
             <input
               type="number"
               min={1}
               value={lengthMin}
-              onChange={(e) => setLengthMin(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => setLengthMin(e.target.value)}
+              onBlur={() => setLengthMin(String(minutesOf(lengthMin)))}
               inputMode="numeric"
             />
           </label>
