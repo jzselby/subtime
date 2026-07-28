@@ -136,6 +136,21 @@ export const periodTag = (periods: number, period: number): string => {
 export const mins = (ms: number): number => Math.round(ms / 60_000);
 
 /**
+ * First and last initial — the shirt-circle label for a player with no
+ * jersey number set. `name.slice(0, 2)` was there before, and for anyone
+ * whose name doesn't start with their first name's only two letters ("Leo
+ * Selby" → "Le") it read as arbitrary rather than as the player. Splitting on
+ * whitespace and taking the outer two initials ("LS") reads as the person
+ * instead, and a single-word name still falls back to its first two letters.
+ */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+}
+
+/**
  * A period-length field held as text while it's being typed, clamped on commit.
  *
  * Clamping on every keystroke — `Math.max(1, Number(value))` in an `onChange`

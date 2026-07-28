@@ -88,7 +88,10 @@ and the start/stop button share one thin strip, and things you touch twice a gam
 
 Every shirt shows number, name, and minutes played. (On a small phone the pitch
 drops the name and keeps number and minutes — three lines of label per player is
-what makes rows collide.) The formation is captioned top-left.
+what makes rows collide.) The formation is captioned top-left. A player with no
+jersey number set shows their initials instead — first and last, "Leo Selby" as
+"LS" — rather than the first two letters of whatever the name happens to start
+with.
 
 - **Drag to sub.** Drag a shirt from the bench onto a player to swap them, onto
   an empty position to fill it, or drag someone off the pitch onto the bench to
@@ -204,6 +207,7 @@ node scripts/smoke.mjs                    # drives a whole game in a real browse
 node scripts/resume.mjs                   # leaves mid-game and comes back
 node scripts/drag.mjs                     # drag-to-sub, as real pointer gestures
 node scripts/bench-touch.mjs              # the bench, under real touch input
+node scripts/initials.mjs                 # shirt circles: number, else initials
 node scripts/edit.mjs                     # correcting a recorded game
 node scripts/clock.mjs                    # the clock across a period boundary
 node scripts/export.mjs                   # download, share and email a CSV

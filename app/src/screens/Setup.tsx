@@ -1,7 +1,7 @@
 import type { PlayerSlot } from '@touchline/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { minutesOf, Screen, Sheet } from '../components';
+import { initials, minutesOf, Screen, Sheet } from '../components';
 import { db, deleteGame, type Game, type Player } from '../db';
 import { useGameLog } from '../hooks';
 import type { Occupant } from '../Pitch';
@@ -192,7 +192,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
           }}
           onTokenPointerDown={(slot, occupant, e) =>
             occupant &&
-            startDrag(occupant.playerId, slot.id, occupant.number || occupant.name.slice(0, 2))(e)
+            startDrag(occupant.playerId, slot.id, occupant.number || initials(occupant.name))(e)
           }
         />
       </div>
@@ -210,9 +210,9 @@ export function SetupScreen({ gameId }: { gameId: string }) {
             <button
               key={p.id}
               className="bplayer"
-              onPointerDown={startDrag(p.id, 'bench', p.number || p.name.slice(0, 2))}
+              onPointerDown={startDrag(p.id, 'bench', p.number || initials(p.name))}
             >
-              <span className="shirt">{p.number || p.name.slice(0, 2)}</span>
+              <span className="shirt">{p.number || initials(p.name)}</span>
               <span className="tname">{p.name}</span>
             </button>
           ))}

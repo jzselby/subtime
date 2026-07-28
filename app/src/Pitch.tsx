@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { heatColor, mmss } from './components';
+import { heatColor, initials, mmss } from './components';
 import type { Formation, Slot } from './formations';
 
 /**
@@ -192,7 +192,7 @@ export function Pitch({
                   : undefined
               }
             >
-              {occupant ? occupant.number || occupant.name.slice(0, 2) : '+'}
+              {occupant ? occupant.number || initials(occupant.name) : '+'}
             </span>
             {occupant ? (
               <span className="tname">{occupant.name}</span>

@@ -7,6 +7,7 @@ import {
   confirmCue,
   heatColor,
   HoldButton,
+  initials,
   mmss,
   periodTag,
   PlayerRow,
@@ -431,7 +432,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
               startDrag(
                 occupant.playerId,
                 slot.id,
-                occupant.number || occupant.name.slice(0, 2),
+                occupant.number || initials(occupant.name),
               )(e)
             }
             dropSlotId={dropSlotId}
@@ -497,12 +498,12 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                   onPointerDown={startDrag(
                     row.playerId,
                     'bench',
-                    p?.number || p?.name.slice(0, 2) || '?',
+                    p?.number || (p ? initials(p.name) : '?'),
                   )}
                   onClick={() => toggle(pickedOn, row.playerId, setPickedOn)}
                 >
                   <span className="shirt" style={{ borderColor: heatColor(row.deficitMs) }}>
-                    {p?.number || p?.name.slice(0, 2) || '?'}
+                    {p?.number || (p ? initials(p.name) : '?')}
                   </span>
                   <span className="tname">{p?.name ?? row.playerId}</span>
                   <span className="ttime">{mmss(stats.get(row.playerId)?.playedMs ?? 0)}</span>
