@@ -203,12 +203,14 @@ npx vite preview --port 4173 --workspace app
 node scripts/smoke.mjs                    # drives a whole game in a real browser
 node scripts/resume.mjs                   # leaves mid-game and comes back
 node scripts/drag.mjs                     # drag-to-sub, as real pointer gestures
+node scripts/bench-touch.mjs              # the bench, under real touch input
 node scripts/edit.mjs                     # correcting a recorded game
 node scripts/clock.mjs                    # the clock across a period boundary
 node scripts/export.mjs                   # download, share and email a CSV
 node scripts/sheets.mjs                   # nothing covers a sheet's buttons
 node scripts/roster.mjs                   # removing a player keeps the record
 node scripts/endgame.mjs                  # ending a game early, and un-ending it
+node scripts/formation-editor.mjs         # more shapes, and building a custom one
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
@@ -226,6 +228,21 @@ and the app must land back on the live screen, still substitutable.
 and checks the resulting squad, plus that a press without movement is still a tap.
 It caught a drop that also fired the tap handler underneath it and left a sheet
 covering the pitch.
+
+`scripts/bench-touch.mjs` drives real touch input through Chromium via CDP,
+which is the only way to exercise `touch-action` at all — mouse-simulated drags
+(everything above) never touch that code path. Reported: a coach couldn't swipe
+sideways through the bench to see the whole roster; it just picked up whichever
+player the swipe started on. The bench strip and the drag gesture share one
+touch surface, and CSS alone can't split them correctly — `touch-action: pan-x`
+was tried first and broke the other half: a browser holding it decides "scroll"
+from the first couple of pixels, and a drag toward any slot that isn't directly
+overhead starts out just as sideways as a real scroll does. The fix disambiguates
+in JS instead, once, off whichever axis moved further, and only when the bench
+under the touch actually has something to scroll. The test covers all three: the
+strip scrolls, a diagonal drag to an off-centre slot still places the player, and
+the live screen's non-scrolling bench (a wrapping grid, nothing to scroll) is
+untouched by any of it.
 
 `scripts/edit.mjs` tests the claim the event log makes: it attributes a goal to
 the wrong player, corrects it in the editor, and confirms the stats screen moves
@@ -268,6 +285,13 @@ that the log records `GAME_END` rather than a second period ever starting, that
 the option disappears once the game is final, and that deleting the event from
 Modify events un-finishes the game — the same recovery a mis-tapped period end
 already gets, since it's an event in the log like any other.
+
+`scripts/formation-editor.mjs` covers the expanded preset list and building a
+custom shape: adding a position, editing its code and line, removing one down to
+— but never past — the last, and the duplicate-code guard, which matters because
+the engine and the position-minutes report both key off the code string, so two
+positions sharing one would silently merge. Verified with teeth: temporarily
+removing the guard in `Formation.tsx` and re-running fails the test.
 
 `scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
 asserts the page does not scroll, the whole pitch is on screen, and **no two

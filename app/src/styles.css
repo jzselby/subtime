@@ -1240,6 +1240,18 @@ body.sheet-open .actions {
   transform: scale(1.12);
 }
 
+/*
+ * Not `pan-x`: that hands the browser first refusal on any gesture with a
+ * sideways component, and a drag toward a slot that isn't directly overhead
+ * — most of them — starts out just as sideways as a scroll does. Measured it:
+ * a touch drag from the bench to an off-centre slot moved 12px right and 10px
+ * up on its first sample, the browser called that "a scroll" and cancelled
+ * the pointer before the gesture had a chance to become a drag. `none` hands
+ * every sample to the pointer listeners instead, and `usePitchDrag` decides
+ * scroll-vs-drag itself, deliberately, off which axis moved further — the
+ * same decision `pan-x` was trying to make, just not thrown away too early to
+ * change its mind.
+ */
 .bplayer {
   touch-action: none;
 }
