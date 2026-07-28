@@ -24,10 +24,14 @@ you no home-screen icon and no offline.
 
 ### GitHub Pages — live
 
-Pages is enabled and `.github/workflows/deploy.yml` rebuilds and republishes on
-every push. The app is at:
+Pages is enabled and `.github/workflows/deploy.yml` builds and tests every
+branch, publishing the default branch. The app is at:
 
 **<https://jzselby.github.io/subtime/>**
+
+Only the default branch publishes, because enabling Pages creates a
+`github-pages` environment that permits deployments from that branch alone. A
+feature branch gets its tests run; **merge it to see the change on your phone.**
 
 To install it:
 
