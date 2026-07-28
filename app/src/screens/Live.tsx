@@ -393,14 +393,24 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         </button>
 
         <div className="gclock">
-          <span
-            className={`time${state.status === 'paused' ? ' paused' : overrun ? ' overrun' : ''}`}
-          >
-            {formatClock(clock)}
+          {/* Score sits beside the clock rather than folded into the small
+              meta line beneath it — same row, so the bar's height (and with
+              it the pitch below) doesn't grow, but the score itself reads at
+              a size a coach can actually catch at a glance, not squeezed in
+              at 11px next to the period label. */}
+          <span className="gtoprow">
+            <span
+              className={`time${state.status === 'paused' ? ' paused' : overrun ? ' overrun' : ''}`}
+            >
+              {formatClock(clock)}
+            </span>
+            <span className="gscore">
+              {state.score.us}–{state.score.them}
+            </span>
           </span>
           <span className="meta">
             {statusLabel}
-            {overrun && ` · +${formatClock(overrunMs)}`} · {state.score.us}–{state.score.them}
+            {overrun && ` · +${formatClock(overrunMs)}`}
           </span>
         </div>
 

@@ -81,10 +81,15 @@ clock, controls, pitch, bench, and action bar all fit on screen, and the pitch
 sizes itself to whatever room is left. Verified on iPhone SE through Pro Max, at
 7v7, 9v9, and 11v11 — see `scripts/checkfit.mjs` below.
 
-The game screen is the pitch. Everything else is deliberately small: clock, score
-and the start/stop button share one thin strip, and things you touch twice a game
-— ending a period, jumping to the stats, switching to the list — live behind the
-**•••** menu rather than spending a row of height each.
+The game screen is the pitch. Everything else is deliberately small: the clock
+and score share one thin strip at the top — the score reads at a size a coach
+can catch at a glance, on the clock's own row rather than a row of its own, so
+it's larger without the bar (or the pitch below it) getting any taller — and
+Pause and hold-to-end at the bottom are sized to this app's own touch-target
+floor rather than bigger than a control tapped a few times a game needs to be.
+Things you touch twice a game — ending a period, jumping to the stats,
+switching to the list — live behind the **•••** menu rather than spending a
+row of height each.
 
 Every shirt shows number, name, and minutes played. (On a small phone the pitch
 drops the name and keeps number and minutes — three lines of label per player is
@@ -256,6 +261,15 @@ node scripts/orientation.mjs              # portrait only, the guard covers ever
 lineup, kickoff, subs, goals, a stoppage, undo, full time — and checks the
 numbers the app reports, including the field-time invariant end to end. It writes
 screenshots to `scripts/shots/`. Pass `--headed` to watch either script.
+
+Also in there: the pause button's size. `.transport-row`'s `align-items:
+stretch` means the pause button and the hold-to-end button next to it size
+off *each other* — shrinking one's `min-height` alone does nothing, since
+stretch just re-inflates it to match whichever sibling is still tall. The
+check reads both buttons' real heights and requires both at the app's own
+touch-target floor, which is what actually catches that: verified with teeth
+by reverting only the hold-to-end button's height back up, which failed
+both checks exactly as that mechanism predicts.
 
 `scripts/resume.mjs` covers the failure mode that matters most on a sideline:
 it starts a game, closes the tab entirely, waits, and reopens. Game time must

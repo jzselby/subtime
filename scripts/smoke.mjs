@@ -171,6 +171,18 @@ await shot(page, 'live-running');
 const clockText = await page.locator('.gclock .time').innerText();
 check('clock is advancing', /0:0[1-9]/.test(clockText), true);
 
+// The pause button used to be 56px — bigger than it needs to be for a
+// control tapped once a stoppage. `.transport-row`'s `align-items: stretch`
+// means shrinking only .tplay's min-height would do nothing on its own; the
+// row would just stretch it back up to match .tstop, which has to shrink
+// with it.
+const playHeight = await page
+  .locator('[aria-label="Pause clock"]')
+  .evaluate((el) => el.getBoundingClientRect().height);
+const stopHeight = await page.locator('.tstop').evaluate((el) => el.getBoundingClientRect().height);
+check('the pause button is the smaller, tap-minimum size', playHeight, 48);
+check("the hold-to-end button matches it, not stretched back up", stopHeight, 48);
+
 // -- a substitution --------------------------------------------------------
 // Bench is sorted most-owed-first, so the top bench row is the app's own
 // suggestion. Take the top on-field row off for them.
@@ -228,12 +240,9 @@ await page.click('.sheet .chip >> nth=0');
 await page.waitForTimeout(300);
 await page.click('text=⚽ Them');
 await page.waitForTimeout(300);
-// The score lives in the clock strip now: "1H · 1–1".
-check(
-  'score reads 1–1',
-  (await page.locator('.gclock .meta').innerText()).includes('1–1'),
-  true,
-);
+// The score sits beside the clock, on its own — larger than the meta line
+// it used to share with the period label, and readable at a glance.
+check('score reads 1–1', (await page.locator('.gscore').innerText()).trim(), '1–1');
 
 // -- stoppage: the clock must freeze --------------------------------------
 await page.click('[aria-label="Pause clock"]');

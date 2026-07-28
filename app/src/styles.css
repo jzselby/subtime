@@ -1157,6 +1157,13 @@ body.sheet-open .actions {
   min-width: 0;
 }
 
+.gtoprow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
 .gclock .time {
   font-size: 30px;
   font-weight: 800;
@@ -1167,6 +1174,18 @@ body.sheet-open .actions {
 
 .gclock .time.paused {
   color: var(--warn);
+}
+
+/* Bigger than the 11px it used to share a line with the period label at,
+   but on the clock's own row rather than a row of its own, so the bar isn't
+   any taller and the pitch below doesn't lose a pixel to it. */
+.gscore {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .gclock .meta {
@@ -1370,19 +1389,23 @@ body.sheet-open .actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 56px;
+  gap: 8px;
+  /* Was 56px — bigger than it needs to be for a button tapped once a
+     stoppage, at the cost of real height in the thumb zone. --tap is this
+     app's own floor for a touch target; matching it rather than undercutting
+     it keeps the button smaller without making it a worse target. */
+  min-height: var(--tap);
   border: 0;
   border-radius: 14px;
   background: var(--surface-3);
   color: var(--text);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .tplay .ticon {
-  font-size: 19px;
+  font-size: 17px;
   line-height: 1;
 }
 
@@ -1428,8 +1451,11 @@ body.sheet-open .actions {
 
 .tstop {
   flex: none;
-  width: 56px;
-  min-height: 56px;
+  /* Matches .tplay's height so `.transport-row`'s `align-items: stretch`
+     doesn't just re-inflate the play button back up to whichever sibling is
+     tallest. */
+  width: var(--tap);
+  min-height: var(--tap);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1443,7 +1469,7 @@ body.sheet-open .actions {
 }
 
 .tstop .ticon {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
 }
 
