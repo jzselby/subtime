@@ -88,6 +88,20 @@ export function Sheet({
 
 export const mmss = (ms: number): string => formatClock(Math.max(0, ms));
 
+/**
+ * Short label for a period: 1H/2H for halves, Q1..Q4 for quarters, else P1..
+ *
+ * The clock reads per-period and this sits beside it. That pairing is what
+ * makes the reading unambiguous without inventing a running total from
+ * configured period lengths that a real game rarely honours.
+ */
+export const periodTag = (periods: number, period: number): string => {
+  if (period < 1) return 'Pre';
+  if (periods === 2) return `${period}H`;
+  if (periods === 4) return `Q${period}`;
+  return `P${period}`;
+};
+
 /** Whole minutes, for tables where seconds are noise. */
 export const mins = (ms: number): number => Math.round(ms / 60_000);
 

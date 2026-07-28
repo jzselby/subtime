@@ -1,8 +1,8 @@
 import type { GameEvent, PlayerSlot } from '@subtime/core';
-import { clockAt, displayClockMs, fairness, formatClock, playerStats } from '@subtime/core';
+import { clockAt, fairness, formatClock, playerStats } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { beep, heatColor, mmss, PlayerRow, Sheet } from '../components';
+import { beep, heatColor, mmss, periodTag, PlayerRow, Sheet } from '../components';
 import { db, deleteGame } from '../db';
 import { describeEvent } from '../describe';
 import { codesOf } from '../formations';
@@ -233,12 +233,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     setFillingSlot(slotId);
   };
 
-  const periodLabel =
-    state.period === 0
-      ? 'Pre'
-      : config.periods.count === 2
-        ? `${state.period}H`
-        : `P${state.period}`;
+  const periodLabel = periodTag(config.periods.count, state.period);
 
   const statusLabel =
     state.status === 'final'
@@ -277,7 +272,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
 
         <div className="gclock">
           <span className={`time${state.status === 'paused' ? ' paused' : ''}`}>
-            {formatClock(displayClockMs(config, Math.max(state.period, 1), clock))}
+            {formatClock(clock)}
           </span>
           <span className="meta">
             {statusLabel} · {state.score.us}–{state.score.them}
@@ -288,9 +283,21 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           className={`gplay${running ? ' on' : ''}`}
           onClick={transport}
           disabled={!canPlay}
-          aria-label={running ? 'Stop clock' : 'Start clock'}
+          aria-label={running ? 'Pause clock' : 'Start clock'}
         >
           {running ? '❚❚' : '▶'}
+        </button>
+        {/* Ending a half is twice-a-game, but it was buried in the ••• menu
+            while the thing next to it — pausing — is a single tap. */}
+        <button
+          className="gstop"
+          onClick={() => {
+            if (confirm(`End ${periodLabel}?`)) void record({ type: 'PERIOD_END' });
+          }}
+          disabled={state.status !== 'running' && state.status !== 'paused'}
+          aria-label={`End ${periodLabel}`}
+        >
+          ■
         </button>
         <button className="gbtn" onClick={() => setSheet('menu')} aria-label="More">
           •••
@@ -456,7 +463,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                   if (confirm(`End ${periodLabel}?`)) void record({ type: 'PERIOD_END' });
                 }}
               >
-                End {periodLabel}
+                End {periodLabel} (or ■ in the bar)
               </button>
             )}
             <button
@@ -542,7 +549,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             {[...events].reverse().map((e) => (
               <div key={e.id}>
                 <time>
-                  {formatClock(displayClockMs(config, Math.max(e.period, 1), e.gameClockMs))}
+                  {periodTag(config.periods.count, e.period)} {formatClock(e.gameClockMs)}
                 </time>
                 <span>{describeEvent(e, nameOf)}</span>
               </div>

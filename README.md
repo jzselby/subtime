@@ -103,7 +103,13 @@ what makes rows collide.) The formation is captioned top-left.
   pitch first, then tap an empty position, to move them there.
 - **"ends 6:00 over"** under a name is a projection — where that player finishes
   if you change nothing — not a statement about right now.
-- **Stop clock** for injuries. Stoppage time never counts as playing time.
+- **❚❚ pauses** for injuries and stoppages. Stopped time never counts as playing
+  time. **■ next to it ends the half** — the two things you do to a running clock
+  sit side by side, and neither is buried in a menu.
+- **The clock reads within the period**, next to `1H` / `2H` (or `Q1`…`Q4`). It
+  is not a padded running total: a half you end at four minutes is four minutes,
+  and the second half opens at 0:00. The whole-game figure — the sum of what was
+  actually played — is on the stats screen.
 - **Undo** removes the last event. Tapping the wrong name costs one tap to fix.
 - **Modify events** (in the ••• menu) corrects anything already recorded — a goal
   given to the wrong player, a card on the wrong name, a substitution that never
@@ -120,7 +126,8 @@ live clock with stoppages · subs and position changes · goals, assists, and
 opponent goals · live fairness ordering and sub suggestions · shift alarm · undo
 and a full event log · per-game report with playing-time bars, a who-was-on-when
 timeline, plus/minus and **minutes in each position by name** · copy-to-clipboard
-summary and CSV export · installable, offline, survives a reload mid-game.
+summary · **CSV by download, share sheet or email** · installable, offline,
+survives a reload mid-game.
 
 ### Formations
 
@@ -159,6 +166,8 @@ node scripts/smoke.mjs                    # drives a whole game in a real browse
 node scripts/resume.mjs                   # leaves mid-game and comes back
 node scripts/drag.mjs                     # drag-to-sub, as real pointer gestures
 node scripts/edit.mjs                     # correcting a recorded game
+node scripts/clock.mjs                    # the clock across a period boundary
+node scripts/export.mjs                   # download, share and email a CSV
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
@@ -180,6 +189,19 @@ covering the pitch.
 `scripts/edit.mjs` tests the claim the event log makes: it attributes a goal to
 the wrong player, corrects it in the editor, and confirms the stats screen moves
 the goal — then deletes a substitution and confirms the squad goes back.
+
+`scripts/clock.mjs` plays a deliberately short first half, ends it from the ■
+button, and starts the second. It exists because a real reading was wrong: the
+clock used to pad each finished period by its *configured* length, so a
+four-second first half opened the second at 30:01. It now asserts the period
+clock restarts, the period label follows, and the whole-game total is the sum of
+what was played.
+
+`scripts/export.mjs` takes the CSV out all three ways. The download is checked end
+to end — the file lands, and its header, row count and goal column are parsed
+back. Share and email hand off to the OS, so those are caught at the boundary:
+`navigator.share` is stubbed and its file and text inspected, and the `mailto:`
+navigation is intercepted and its subject and body read.
 
 `scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
 asserts the page does not scroll, the whole pitch is on screen, and **no two

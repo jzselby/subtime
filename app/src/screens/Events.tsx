@@ -1,8 +1,8 @@
 import type { GameEvent } from '@subtime/core';
-import { displayClockMs, formatClock } from '@subtime/core';
+import { formatClock } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
-import { Screen, Sheet } from '../components';
+import { periodTag, Screen, Sheet } from '../components';
 import { db } from '../db';
 import { describeEvent, isEditable } from '../describe';
 import { useGameLog } from '../hooks';
@@ -96,7 +96,7 @@ export function EventsScreen({ gameId }: { gameId: string }) {
         {shown.map((e) => (
           <button key={e.id} className="prow" onClick={() => setEditing(e)}>
             <span className="evtime">
-              {formatClock(displayClockMs(config, Math.max(e.period, 1), e.gameClockMs))}
+              {periodTag(config.periods.count, e.period)} {formatClock(e.gameClockMs)}
             </span>
             <span className="grow">
               <span className="name">{describeEvent(e, nameOf)}</span>

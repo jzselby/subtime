@@ -328,6 +328,15 @@ label.field > span {
   width: 100%;
 }
 
+/* A choice with a line of explanation under it — export routes, mostly. */
+.btn.stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  text-align: left;
+}
+
 .btn.lg {
   min-height: 60px;
   font-size: 18px;
@@ -641,7 +650,7 @@ label.field > span {
 
 .log time {
   flex: none;
-  width: 52px;
+  width: 66px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1247,8 +1256,34 @@ label.field > span {
 /* Event-log rows: clock on the left, so the list scans as a timeline. */
 .evtime {
   flex: none;
-  width: 52px;
+  width: 66px;
   color: var(--muted);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+/* End-period button, beside the transport. Square, and visually quieter than
+   play — it is the destructive one of the pair. */
+.gstop {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gstop:active:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.gstop:disabled {
+  opacity: 0.3;
 }

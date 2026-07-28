@@ -12,7 +12,6 @@ export { initialState, reduce } from './reducer.js';
 export type { GameState, ReduceResult } from './reducer.js';
 export {
   clockAt,
-  displayClockMs,
   elapsedGameMs,
   formatClock,
   remainingInGameMs,

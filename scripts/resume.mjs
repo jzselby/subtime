@@ -67,7 +67,7 @@ await page.waitForTimeout(200);
 await page.click('text=Start game');
 await page.waitForSelector('[aria-label="Start clock"]');
 await page.click('[aria-label="Start clock"]');
-await page.waitForSelector('[aria-label="Stop clock"]');
+await page.waitForSelector('[aria-label="Pause clock"]');
 await page.waitForTimeout(2000);
 
 const before = secs(await page.locator('.gclock .time').innerText());
@@ -99,7 +99,7 @@ await fresh.waitForSelector('text=Roster · 6');
 // Tapping the live game must land on the live screen, not setup.
 await fresh.click('.prow:has-text("vs Away")');
 await fresh.waitForSelector('.pitch', { timeout: 5000 });
-check('reopens on the live screen', await fresh.locator('[aria-label="Stop clock"]').count(), 1);
+check('reopens on the live screen', await fresh.locator('[aria-label="Pause clock"]').count(), 1);
 
 const after = secs(await fresh.locator('.gclock .time').innerText());
 // The clock is derived from timestamps rather than ticked, so it must reflect

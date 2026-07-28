@@ -164,7 +164,7 @@ await shot(page, 'live-pregame');
 
 // -- kick off --------------------------------------------------------------
 await page.click('[aria-label="Start clock"]');
-await page.waitForSelector('[aria-label="Stop clock"]');
+await page.waitForSelector('[aria-label="Pause clock"]');
 await page.waitForTimeout(2500);
 await shot(page, 'live-running');
 
@@ -216,7 +216,7 @@ check(
 );
 
 // -- stoppage: the clock must freeze --------------------------------------
-await page.click('[aria-label="Stop clock"]');
+await page.click('[aria-label="Pause clock"]');
 await page.waitForTimeout(200);
 const frozen = await page.locator('.gclock .time').innerText();
 await page.waitForTimeout(1800);

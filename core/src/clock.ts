@@ -1,5 +1,4 @@
 import type { GameState } from './reducer.js';
-import type { GameConfig } from './types.js';
 
 /**
  * Clock derivation.
@@ -45,14 +44,16 @@ export function remainingInGameMs(state: GameState, nowWallTs: number): number {
   return periodsNotStarted * lengthMs + remainingInPeriodMs(state, nowWallTs);
 }
 
-/**
- * Continuous clock for display: second half of a 2×30 reads 30:00–60:00 rather
- * than restarting at zero. Internally the clock is always per-period, because
- * that keeps the stint maths free of cumulative offsets.
+/*
+ * There is deliberately no "continuous match clock" helper here.
+ *
+ * One existed and padded each earlier period by its *configured* length, so a
+ * half that ended early — a tournament game, a referee cutting it short —
+ * jumped the clock forward by the difference: four seconds played, second half
+ * opening at 30:01. Periods do not reliably run their configured length, so the
+ * only honest running total is `elapsedGameMs`, which sums what was actually
+ * played. Screens show the period clock next to the period label instead.
  */
-export function displayClockMs(config: GameConfig, period: number, clockMs: number): number {
-  return Math.max(0, period - 1) * config.periods.lengthMs + clockMs;
-}
 
 /** `m:ss`, or `h:mm:ss` past an hour. */
 export function formatClock(ms: number): string {

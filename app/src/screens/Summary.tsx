@@ -28,6 +28,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   const now = useNow(state.status === 'running');
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [share, setShare] = useState(false);
 
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
@@ -90,7 +91,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
     }
   };
 
-  const exportCsv = () => {
+  const csvText = () => {
     const header = [
       'player', 'minutes', 'bench_minutes', 'positions', 'goals', 'assists',
       'plus_minus', 'shots', 'saves', 'stints',
@@ -104,15 +105,66 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
         .join(' '),
       s.goals, s.assists, s.plusMinus, s.shots, s.saves, s.stintCount,
     ]);
-    const csv = [header, ...rows]
+    return [header, ...rows]
       .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
       .join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  };
+
+  const csvName = () =>
+    `${team.name}-vs-${game.opponent || 'game'}-${new Date(game.kickoffAt).toISOString().slice(0, 10)}.csv`
+      .replace(/[^\w.-]+/g, '-');
+
+  const downloadCsv = () => {
+    const url = URL.createObjectURL(new Blob([csvText()], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${team.name}-vs-${game.opponent || 'game'}-${new Date(game.kickoffAt).toISOString().slice(0, 10)}.csv`;
+    a.download = csvName();
     a.click();
     URL.revokeObjectURL(url);
+    setShare(false);
+  };
+
+  /*
+   * On a phone the share sheet is the only route to Messages, Mail, AirDrop and
+   * Files, and it is the only one that can carry the CSV as a real attachment.
+   * Not every browser will take a file, so this degrades: file + text, then text
+   * alone, then the clipboard.
+   */
+  const shareCsv = async () => {
+    const text = summaryText();
+    const title = `${team.name} vs ${game.opponent || 'Opponent'}`;
+    try {
+      const file = new File([csvText()], csvName(), { type: 'text/csv' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title, text, files: [file] });
+      } else if (navigator.share) {
+        await navigator.share({ title, text: `${text}\n\n${csvText()}` });
+      } else {
+        await navigator.clipboard.writeText(`${text}\n\n${csvText()}`);
+        alert('Sharing is not available in this browser — the stats were copied instead.');
+      }
+      setShare(false);
+    } catch (err) {
+      // A cancelled share sheet throws AbortError; that is not a failure.
+      if ((err as Error)?.name !== 'AbortError') setShare(false);
+    }
+  };
+
+  /*
+   * mailto cannot attach a file, so the CSV goes inline in the body where it
+   * still pastes straight into a spreadsheet. Long rosters can outrun the URL
+   * limit some clients impose, so past a safe size the body carries the readable
+   * summary and the CSV is downloaded alongside it.
+   */
+  const emailCsv = () => {
+    const csv = csvText();
+    const full = `${summaryText()}\n\nCSV\n${csv}`;
+    const tooLong = encodeURIComponent(full).length > 1800;
+    if (tooLong) downloadCsv();
+    const subject = `${team.name} ${state.score.us}–${state.score.them} ${game.opponent || 'Opponent'} — stats`;
+    const body = tooLong ? `${summaryText()}\n\n(Full CSV attached from your downloads.)` : full;
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setShare(false);
   };
 
   return (
@@ -136,7 +188,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
           <button className="btn" onClick={() => void copy()}>
             {copied ? '✓ Copied' : 'Copy summary'}
           </button>
-          <button className="btn" onClick={exportCsv}>
+          <button className="btn" onClick={() => setShare(true)}>
             Export CSV
           </button>
           {state.status !== 'final' && (
@@ -147,6 +199,31 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
         </div>
       }
     >
+      {share && (
+        <Sheet title="Export stats" onClose={() => setShare(false)}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <button className="btn block stack" onClick={downloadCsv}>
+              Download CSV
+              <span className="small muted" style={{ display: 'block' }}>
+                Saves the file — opens in Numbers, Excel or Sheets.
+              </span>
+            </button>
+            <button className="btn block stack" onClick={() => void shareCsv()}>
+              Text or share…
+              <span className="small muted" style={{ display: 'block' }}>
+                Messages, WhatsApp, AirDrop — anything in the share sheet.
+              </span>
+            </button>
+            <button className="btn block stack" onClick={emailCsv}>
+              Email
+              <span className="small muted" style={{ display: 'block' }}>
+                Opens a draft with the summary and the CSV in the body.
+              </span>
+            </button>
+          </div>
+        </Sheet>
+      )}
+
       {menu && (
         <Sheet title={`vs ${game.opponent || 'TBD'}`} onClose={() => setMenu(false)}>
           <div style={{ display: 'grid', gap: 8 }}>
