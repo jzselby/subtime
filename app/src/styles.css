@@ -82,6 +82,41 @@ input,
   margin: 0 auto;
 }
 
+/*
+ * Portrait only. `screen.orientation.lock()` in App.tsx is the hard version
+ * — it works on Android Chrome once installed, stopping the OS from ever
+ * rotating the layout — but neither iOS nor a plain browser tab implements
+ * it, and this app is built one-handed around a narrow pitch, not a wide
+ * one. This is the guard that works everywhere regardless: a live media
+ * query, so it tracks the device's actual orientation rather than a value
+ * read once, and it sits above everything (sheets included) at the top of
+ * the z-index scale.
+ */
+.landscape-guard {
+  display: none;
+}
+
+@media (orientation: landscape) {
+  .landscape-guard {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px;
+    text-align: center;
+    background: var(--bg);
+  }
+
+  /* Nothing underneath should be reachable while the guard is up. */
+  .app {
+    visibility: hidden;
+  }
+}
+
 /* ---------------------------------------------------------------- header -- */
 
 .top {

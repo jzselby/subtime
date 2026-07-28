@@ -169,7 +169,7 @@ and a full event log · per-game report with playing-time bars, a who-was-on-whe
 timeline, plus/minus and **minutes in each position by name** · copy-to-clipboard
 summary · **a styled HTML report, or CSV, by download, share sheet or email** ·
 **season totals per player, summed across every game a team has started** ·
-installable, offline, survives a reload mid-game.
+**locked to portrait** · installable, offline, survives a reload mid-game.
 
 The report is what's meant to be opened and read: a styled HTML page, one clean
 table — player, number, minutes, bench, positions played, goals, assists,
@@ -249,6 +249,7 @@ node scripts/formation-editor.mjs         # more shapes, and building a custom o
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 node scripts/season.mjs                   # season totals actually sum across games
 node scripts/keyboard.mjs                 # a sheet's input stays above the keyboard
+node scripts/orientation.mjs              # portrait only, the guard covers everything
 ```
 
 `scripts/smoke.mjs` plays a full two-half game through the actual UI — roster,
@@ -369,6 +370,22 @@ same mechanism the fix depends on directly: it overrides
 then checks the backdrop — and the sheet inside it — actually shrink to fit
 above that line. Verified with teeth: removing the inline height override
 this relies on reproduces the original bug exactly, sheet included.
+
+`scripts/orientation.mjs` covers the portrait lock: `screen.orientation.lock()`
+is a hard lock, but it only works on Android Chrome once installed as a
+standalone app, so a CSS `.landscape-guard` — a live `@media (orientation:
+landscape)` query — covers the whole screen, sheets included, the moment a
+device turns sideways, everywhere else. Headless Chromium has no
+accelerometer, but `orientation: landscape` is purely a function of viewport
+aspect ratio, so resizing the viewport exercises the same mechanism a real
+rotation would. The test checks the guard is inert and taps reach the app in
+portrait, that it takes over and actually catches a tap in landscape — including
+one landing on a sheet that was already open — and that it stands back down on
+rotating back. The guard's own text is conditionally rendered, not just
+CSS-hidden, specifically so it can never collide with another script's
+`text=` selector the way an always-present-but-hidden copy of it did twice
+during development (Playwright's `text=` matches case-insensitive substrings
+against *any* matching element, visible or not).
 
 The engine's own guarantee is documented in [`core/README.md`](./core/README.md):
 `Σ player minutes == ∫ onFieldCount dt`, verified two independent ways over
