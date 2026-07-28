@@ -93,7 +93,7 @@ check('pitch is drawn', await page.locator('.pitch-lines').count(), 1);
 check('a slot per player', await page.locator('.token').count(), 7);
 await shot(page, 'formation');
 
-await page.click('.chips >> text=3-2-1');
+await page.click('.chips >> text=1-3-2-1');
 await page.waitForTimeout(150);
 check('preset changed the shape', await page.locator('.token').count(), 7);
 
@@ -143,21 +143,21 @@ await page.waitForSelector('.pitch');
 await shot(page, 'live-pregame');
 
 // -- kick off --------------------------------------------------------------
-await page.click('text=Start 1st half');
-await page.waitForSelector('text=Stop clock');
+await page.click('[aria-label="Start clock"]');
+await page.waitForSelector('[aria-label="Stop clock"]');
 await page.waitForTimeout(2500);
 await shot(page, 'live-running');
 
-const clockText = await page.locator('.livebar .time').innerText();
+const clockText = await page.locator('.gclock .time').innerText();
 check('clock is advancing', /0:0[1-9]/.test(clockText), true);
 
 // -- a substitution --------------------------------------------------------
 // Bench is sorted most-owed-first, so the top bench row is the app's own
 // suggestion. Take the top on-field row off for them.
 check('field view is the default', await page.locator('.pitch').count(), 1);
-const benchName = await page.locator('.benchstrip .bplayer .tname >> nth=0').innerText();
+const benchName = await page.locator('.benchgrid .bplayer .tname >> nth=0').innerText();
 await page.click('.token:not(.vacant) >> nth=0');
-await page.click('.benchstrip .bplayer >> nth=0');
+await page.click('.benchgrid .bplayer >> nth=0');
 await shot(page, 'live-sub-pending');
 await page.click('text=/^Sub 1 ↔ 1$/');
 await page.waitForTimeout(400);
@@ -168,7 +168,8 @@ check('still 7 on the pitch', onPitch.length, 7);
 await shot(page, 'live-after-sub');
 
 // The list view must stay in step with the pitch.
-await page.click('[aria-label="Switch to list view"]');
+await page.click('[aria-label="More"]');
+await page.click('.sheet >> text=Show as list');
 await page.waitForTimeout(150);
 check(
   'list view agrees with the pitch',
@@ -176,7 +177,8 @@ check(
   7,
 );
 await shot(page, 'live-list');
-await page.click('[aria-label="Switch to field view"]');
+await page.click('[aria-label="More"]');
+await page.click('.sheet >> text=Show the field');
 await page.waitForTimeout(150);
 
 // -- goals -----------------------------------------------------------------
@@ -186,54 +188,62 @@ await page.click('.sheet .chip >> nth=0');
 await page.waitForTimeout(300);
 await page.click('text=⚽ Them');
 await page.waitForTimeout(300);
-check('score reads 1–1', (await page.locator('.scoreline').innerText()).replace(/\s+/g, ''), '1–1');
+// The score lives in the clock strip now: "1H · 1–1".
+check(
+  'score reads 1–1',
+  (await page.locator('.gclock .meta').innerText()).includes('1–1'),
+  true,
+);
 
 // -- stoppage: the clock must freeze --------------------------------------
-await page.click('text=Stop clock');
+await page.click('[aria-label="Stop clock"]');
 await page.waitForTimeout(200);
-const frozen = await page.locator('.livebar .time').innerText();
+const frozen = await page.locator('.gclock .time').innerText();
 await page.waitForTimeout(1800);
-check('clock frozen while stopped', await page.locator('.livebar .time').innerText(), frozen);
+check('clock frozen while stopped', await page.locator('.gclock .time').innerText(), frozen);
 await shot(page, 'live-paused');
 
-await page.click('text=Restart clock');
+await page.click('[aria-label="Start clock"]');
 await page.waitForTimeout(1200);
 check(
   'clock resumes from the pause point',
-  (await page.locator('.livebar .time').innerText()) !== frozen,
+  (await page.locator('.gclock .time').innerText()) !== frozen,
   true,
 );
 
 // -- undo ------------------------------------------------------------------
-await page.click('text=☰ Log');
+await page.click('[aria-label="Event log"]');
 const logLines = await page.locator('.log div').count();
 await page.click('.sheet >> text=Close');
 await page.click('text=↩ Undo');
 await page.waitForTimeout(300);
-await page.click('text=☰ Log');
+await page.click('[aria-label="Event log"]');
 check('undo removed one event', await page.locator('.log div').count(), logLines - 1);
 await shot(page, 'live-log');
 await page.click('.sheet >> text=Close');
 
 // -- run out both halves ---------------------------------------------------
 page.on('dialog', (d) => d.accept());
-await page.click('text=End 1st');
-await page.waitForSelector('text=Start 2nd half');
-await page.click('text=Start 2nd half');
+await page.click('[aria-label="More"]');
+await page.click('.sheet >> text=End 1H');
+await page.waitForTimeout(300);
+await page.click('[aria-label="Start clock"]');
 await page.waitForTimeout(1500);
 
 // A second sub in the second half, so the timeline has something to show.
 await page.click('.token:not(.vacant) >> nth=0');
-await page.click('.benchstrip .bplayer >> nth=0');
+await page.click('.benchgrid .bplayer >> nth=0');
 await page.click('text=/^Sub 1 ↔ 1$/');
 await page.waitForTimeout(1200);
 
-await page.click('text=End 2nd');
-await page.waitForSelector('text=Full time');
+await page.click('[aria-label="More"]');
+await page.click('.sheet >> text=End 2H');
+await page.waitForTimeout(300);
 await shot(page, 'live-fulltime');
 
 // -- summary ---------------------------------------------------------------
-await page.click('text=Full time — see the stats');
+await page.click('[aria-label="More"]');
+await page.click('.sheet >> text=Stats and playing time');
 await page.waitForSelector('text=Playing-time fairness');
 await page.waitForTimeout(300);
 await shot(page, 'summary');

@@ -71,11 +71,14 @@ clock, controls, pitch, bench, and action bar all fit on screen, and the pitch
 sizes itself to whatever room is left. Verified on iPhone SE through Pro Max, at
 7v7, 9v9, and 11v11 — see `scripts/checkfit.mjs` below.
 
-The game screen opens on the **field view**: your shape, with a shirt at every
-position showing number, name, and minutes played. The **☰** button in the header
-switches to a list when you want to scan the numbers. (On a small phone the pitch
-drops the name under each shirt and keeps the number and minutes — three lines of
-label per player is what makes rows collide.)
+The game screen is the pitch. Everything else is deliberately small: clock, score
+and the start/stop button share one thin strip, and things you touch twice a game
+— ending a period, jumping to the stats, switching to the list — live behind the
+**•••** menu rather than spending a row of height each.
+
+Every shirt shows number, name, and minutes played. (On a small phone the pitch
+drops the name and keeps number and minutes — three lines of label per player is
+what makes rows collide.) The formation is captioned top-left.
 
 - **Two taps to sub:** a player on the pitch, then a player on the bench strip
   underneath. Both take multiple selections, so a four-player change at a
@@ -102,11 +105,19 @@ export · installable, offline, survives a reload mid-game.
 
 ### Formations
 
-Presets for every squad size (7v7 gives you 2-3-1, 3-2-1, 2-1-2-1, 3-1-2; 11v11
-gives 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 5-3-2). Pick one, then drag any position to
-where you want it and save it to the team. Coordinates are normalised, so your
-shape looks the same on any screen. Each game snapshots the formation it was
-played in, so changing your shape later never rewrites an old game.
+Named the way a team sheet writes them, with the keeper counted: a 7-a-side 2-3-1
+is **1-2-3-1**. Presets for every squad size (7v7 gives 1-2-3-1, 1-3-2-1,
+1-2-1-2-1, 1-3-1-2; 11v11 gives 1-4-4-2, 1-4-3-3, 1-4-2-3-1, 1-3-5-2, 1-5-3-2).
+
+Positions carry their line — `ST · F`, `CM · M`, `LB · D` — and lines are not
+flat rows: full-backs push up past the centre-backs, a midfield three holds
+through the middle, wingers play off the striker's shoulder, and a strike pair
+stays central while a back four hugs the touchline.
+
+Pick a shape, then drag any position where you actually want it and save it to the
+team. Coordinates are normalised, so your shape looks the same on any screen. Each
+game snapshots the formation it was played in, so changing your shape later never
+rewrites an old game.
 
 ## What doesn't yet
 

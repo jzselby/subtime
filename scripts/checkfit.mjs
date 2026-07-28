@@ -40,7 +40,7 @@ for (const [label, w, h] of DEVICES) {
   await p.waitForTimeout(200);
   await p.click('text=Start game');
   await p.waitForSelector('.pitch');
-  await p.click('text=Start 1st half');
+  await p.click('[aria-label="Start clock"]');
   await p.waitForTimeout(1000);
   await p.screenshot({ path: `/home/user/subtime/scripts/shots/fit-${w}-${size}v${size}.png` });
 

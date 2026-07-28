@@ -244,7 +244,8 @@ rain, watching the game — not the screen.
 - **Prominent undo,** plus a full event-log editor for post-game cleanup.
 - **Two views:** a pitch view (spatial, matches how you think about the shape)
   and a list view (fastest to scan minutes). Built both — the pitch is the
-  default, because on a sideline you are looking at a shape, not a table.
+  default and gets the whole screen, because on a sideline you are looking at a
+  shape, not a table. Everything else shrinks to make room for it.
 - **Sub interval alarm:** optional buzz every N minutes at a natural stoppage.
 - **Goal entry in one flow:** tap GOAL → pick scorer from the on-field six → pick
   assist or skip. Never make the coach scroll the full roster mid-celebration.

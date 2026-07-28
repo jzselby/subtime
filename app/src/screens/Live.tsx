@@ -2,7 +2,7 @@ import type { GameEvent, PlayerSlot } from '@subtime/core';
 import { clockAt, displayClockMs, fairness, formatClock, playerStats } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { beep, heatColor, mmss, PlayerRow, Screen, Sheet } from '../components';
+import { beep, heatColor, mmss, PlayerRow, Sheet } from '../components';
 import { db } from '../db';
 import { codesOf } from '../formations';
 import { useGameLog, useNow, useWakeLock } from '../hooks';
@@ -16,6 +16,15 @@ const DEFAULT_CFG = {
   gkPosition: 'GK',
 };
 
+/**
+ * The game screen.
+ *
+ * The pitch is the interface, so it gets the screen: full-bleed and taking every
+ * pixel not needed by the bar above and the bench below. Everything else is
+ * deliberately small — the clock, score and transport live in one thin strip,
+ * and infrequent controls (ending a period, jumping to stats) sit behind a menu
+ * rather than spending a row of height each.
+ */
 export function LiveScreen({ gameId }: { gameId: string }) {
   const game = useLiveQuery(() => db.games.get(gameId), [gameId]);
   const team = useLiveQuery(
@@ -37,7 +46,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const [view, setView] = useState<'field' | 'list'>('field');
   const [pickedOff, setPickedOff] = useState<Set<string>>(new Set());
   const [pickedOn, setPickedOn] = useState<Set<string>>(new Set());
-  const [sheet, setSheet] = useState<'goal' | 'log' | null>(null);
+  const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | null>(null);
   const [movingPlayer, setMovingPlayer] = useState<string | null>(null);
   const [fillingSlot, setFillingSlot] = useState<string | null>(null);
 
@@ -86,7 +95,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     if (!shiftDue) alarmed.current = false;
   }, [shiftDue]);
 
-  if (!game || !team) return <Screen title="Loading…">{null}</Screen>;
+  if (!game || !team) return <div className="app" />;
 
   const formation = game.formation;
   const positions = codesOf(formation);
@@ -155,135 +164,77 @@ export function LiveScreen({ gameId }: { gameId: string }) {
 
   const periodLabel =
     state.period === 0
-      ? 'Not started'
+      ? 'Pre'
       : config.periods.count === 2
-        ? state.period === 1
-          ? '1st half'
-          : '2nd half'
-        : `Period ${state.period}`;
+        ? `${state.period}H`
+        : `P${state.period}`;
+
+  const statusLabel =
+    state.status === 'final'
+      ? 'FT'
+      : state.status === 'break'
+        ? `${periodLabel} done`
+        : state.status === 'paused'
+          ? 'stopped'
+          : periodLabel;
 
   const hasSelection = pickedOff.size > 0 || pickedOn.size > 0;
+  const canPlay = state.status !== 'final';
+
+  const transport = () => {
+    if (state.status === 'running') void record({ type: 'CLOCK_PAUSE' });
+    else if (state.status === 'paused') void record({ type: 'CLOCK_RESUME' });
+    else if (state.status === 'pregame' || state.status === 'break')
+      void record({ type: 'PERIOD_START' });
+  };
 
   return (
-    <Screen
-      title={`${team.name} vs ${game.opponent || 'TBD'}`}
-      subtitle={`${periodLabel} · ${formation.name}`}
-      fill
-      onBack={() => navigate({ name: 'team', teamId: game.teamId })}
-      action={
-        <>
-          <button
-            className="btn ghost"
-            aria-label={view === 'field' ? 'Switch to list view' : 'Switch to field view'}
-            onClick={() => setView(view === 'field' ? 'list' : 'field')}
-          >
-            {view === 'field' ? '☰' : '⌗'}
-          </button>
-          <button className="btn ghost" onClick={() => navigate({ name: 'summary', gameId })}>
-            Stats
-          </button>
-        </>
-      }
-      footer={
-        hasSelection ? (
-          <div className="subbar">
-            <div className="row spread small">
-              <span className="muted">
-                Off: {[...pickedOff].map((id) => nameOf(id)?.name ?? '?').join(', ') || '—'}
-              </span>
-              <span className="muted">
-                On: {[...pickedOn].map((id) => nameOf(id)?.name ?? '?').join(', ') || '—'}
-              </span>
-            </div>
-            <div className="row">
-              <button
-                className="btn ghost"
-                onClick={() => {
-                  setPickedOff(new Set());
-                  setPickedOn(new Set());
-                }}
-              >
-                Cancel
-              </button>
-              <button className="btn primary grow lg" onClick={() => void makeSub()}>
-                Sub {pickedOff.size} ↔ {pickedOn.size}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="actions">
-            <button className="btn" onClick={() => setSheet('goal')} disabled={state.period === 0}>
-              ⚽ Us
-            </button>
-            <button
-              className="btn"
-              onClick={() => void record({ type: 'OPPONENT_GOAL' })}
-              disabled={state.period === 0}
-            >
-              ⚽ Them
-            </button>
-            <button className="btn" onClick={() => void undo()} disabled={events.length === 0}>
-              ↩ Undo
-            </button>
-            <button className="btn" onClick={() => setSheet('log')}>
-              ☰ Log
-            </button>
-          </div>
-        )
-      }
-    >
+    <div className="app">
+      {/* One strip for clock, score and transport — the whole of the old
+          header, clock card and period-control rows in ~64px. */}
+      <header className="gamebar">
+        <button
+          className="gbtn"
+          onClick={() => navigate({ name: 'team', teamId: game.teamId })}
+          aria-label="Back"
+        >
+          ‹
+        </button>
+        <button className="gbtn" onClick={() => setSheet('log')} aria-label="Event log">
+          ☰
+        </button>
+
+        <div className="gclock">
+          <span className={`time${state.status === 'paused' ? ' paused' : ''}`}>
+            {formatClock(displayClockMs(config, Math.max(state.period, 1), clock))}
+          </span>
+          <span className="meta">
+            {statusLabel} · {state.score.us}–{state.score.them}
+          </span>
+        </div>
+
+        <button
+          className={`gplay${running ? ' on' : ''}`}
+          onClick={transport}
+          disabled={!canPlay}
+          aria-label={running ? 'Stop clock' : 'Start clock'}
+        >
+          {running ? '❚❚' : '▶'}
+        </button>
+        <button className="gbtn" onClick={() => setSheet('menu')} aria-label="More">
+          •••
+        </button>
+      </header>
+
       {errors.length > 0 && (
-        <div className="banner error">
+        <div className="banner error" style={{ margin: '8px 12px 0' }}>
           {errors.length} event{errors.length === 1 ? '' : 's'} could not be applied.{' '}
           {errors[errors.length - 1]?.reason}
         </div>
       )}
 
-      {/*
-        The pitch is the interface during a game, so everything above it is kept
-        as short as it can be — a tall clock card looks impressive and pushes the
-        thing you actually tap below the fold.
-      */}
-      <div className="card livebar">
-        <div className="lb-clock">
-          <span className={`time${state.status === 'paused' ? ' paused' : ''}`}>
-            {formatClock(displayClockMs(config, Math.max(state.period, 1), clock))}
-          </span>
-          <span className="meta">
-            {state.status === 'paused'
-              ? 'stopped'
-              : state.status === 'final'
-                ? 'full time'
-                : state.status === 'break'
-                  ? `${periodLabel} done`
-                  : periodLabel}
-          </span>
-        </div>
-        <div className="scoreline">
-          <span>{state.score.us}</span>
-          <span className="vs">–</span>
-          <span>{state.score.them}</span>
-        </div>
-      </div>
-      {shiftDue && (
-        <div className="banner error">
-          Shift due — last change {mmss(clock - lastSubClock)} ago
-        </div>
-      )}
-
-      <PeriodControls
-        status={state.status}
-        period={state.period}
-        count={config.periods.count}
-        onStart={() => void record({ type: 'PERIOD_START' })}
-        onPause={() => void record({ type: 'CLOCK_PAUSE' })}
-        onResume={() => void record({ type: 'CLOCK_RESUME' })}
-        onEnd={() => void record({ type: 'PERIOD_END' })}
-        onSummary={() => navigate({ name: 'summary', gameId })}
-      />
-
       {view === 'field' ? (
-        <div className="pitchwrap">
+        <div className="pitchwrap bleed">
           <Pitch
             formation={formation}
             occupants={occupants}
@@ -293,7 +244,10 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 ? toggle(pickedOff, occupant.playerId, setPickedOff)
                 : tapVacant(slot.code, slot.id)
             }
-          />
+          >
+            <span className="fname">{formation.name}</span>
+            {shiftDue && <span className="shiftpill">Shift due</span>}
+          </Pitch>
         </div>
       ) : (
         <div className="pane">
@@ -337,12 +291,12 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         </div>
       )}
 
-      {view === 'field' &&
-        (benchRows.length === 0 ? (
-          <p className="small muted center">Everyone is on the field.</p>
-        ) : (
-          <div className="benchstrip">
-            {benchRows.map((row) => {
+      {view === 'field' && (
+        <div className="benchgrid">
+          {benchRows.length === 0 ? (
+            <p className="small muted">Everyone is on the field.</p>
+          ) : (
+            benchRows.map((row) => {
               const p = nameOf(row.playerId);
               return (
                 <button
@@ -357,9 +311,81 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                   <span className="ttime">{mmss(stats.get(row.playerId)?.playedMs ?? 0)}</span>
                 </button>
               );
-            })}
+            })
+          )}
+        </div>
+      )}
+
+      {hasSelection ? (
+        <div className="subbar">
+          <div className="row">
+            <button
+              className="btn ghost"
+              onClick={() => {
+                setPickedOff(new Set());
+                setPickedOn(new Set());
+              }}
+            >
+              Cancel
+            </button>
+            <button className="btn primary grow" onClick={() => void makeSub()}>
+              Sub {pickedOff.size} ↔ {pickedOn.size}
+            </button>
           </div>
-        ))}
+        </div>
+      ) : (
+        <div className="actions slim">
+          <button className="btn" onClick={() => setSheet('goal')} disabled={state.period === 0}>
+            ⚽ Us
+          </button>
+          <button
+            className="btn"
+            onClick={() => void record({ type: 'OPPONENT_GOAL' })}
+            disabled={state.period === 0}
+          >
+            ⚽ Them
+          </button>
+          <button className="btn" onClick={() => void undo()} disabled={events.length === 0}>
+            ↩ Undo
+          </button>
+        </div>
+      )}
+
+      {sheet === 'menu' && (
+        <Sheet title={`${team.name} vs ${game.opponent || 'TBD'}`} onClose={() => setSheet(null)}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <p className="small muted">
+              {formation.name} · {config.periods.count} × {Math.round(config.periods.lengthMs / 60_000)} min
+            </p>
+            {(state.status === 'running' || state.status === 'paused') && (
+              <button
+                className="btn warn block"
+                onClick={() => {
+                  setSheet(null);
+                  if (confirm(`End ${periodLabel}?`)) void record({ type: 'PERIOD_END' });
+                }}
+              >
+                End {periodLabel}
+              </button>
+            )}
+            <button
+              className="btn block"
+              onClick={() => {
+                setView(view === 'field' ? 'list' : 'field');
+                setSheet(null);
+              }}
+            >
+              {view === 'field' ? 'Show as list' : 'Show the field'}
+            </button>
+            <button
+              className="btn block"
+              onClick={() => navigate({ name: 'summary', gameId })}
+            >
+              Stats and playing time
+            </button>
+          </div>
+        </Sheet>
+      )}
 
       {fillingSlot && (
         <Sheet
@@ -409,7 +435,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           <div className="log">
             {[...events].reverse().map((e) => (
               <div key={e.id}>
-                <time>{formatClock(displayClockMs(config, Math.max(e.period, 1), e.gameClockMs))}</time>
+                <time>
+                  {formatClock(displayClockMs(config, Math.max(e.period, 1), e.gameClockMs))}
+                </time>
                 <span>{describe(e, nameOf)}</span>
               </div>
             ))}
@@ -439,62 +467,6 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           </div>
         </Sheet>
       )}
-    </Screen>
-  );
-}
-
-function PeriodControls({
-  status,
-  period,
-  count,
-  onStart,
-  onPause,
-  onResume,
-  onEnd,
-  onSummary,
-}: {
-  status: string;
-  period: number;
-  count: number;
-  onStart: () => void;
-  onPause: () => void;
-  onResume: () => void;
-  onEnd: () => void;
-  onSummary: () => void;
-}) {
-  if (status === 'final') {
-    return (
-      <button className="btn primary block lg" onClick={onSummary}>
-        Full time — see the stats
-      </button>
-    );
-  }
-  if (status === 'pregame' || status === 'break') {
-    return (
-      <button className="btn primary block lg" onClick={onStart}>
-        Start {ordinal(period + 1)} {count === 2 ? 'half' : 'period'}
-      </button>
-    );
-  }
-  return (
-    <div className="row">
-      {status === 'running' ? (
-        <button className="btn warn grow lg" onClick={onPause}>
-          Stop clock
-        </button>
-      ) : (
-        <button className="btn primary grow lg" onClick={onResume}>
-          Restart clock
-        </button>
-      )}
-      <button
-        className="btn grow lg"
-        onClick={() => {
-          if (confirm(`End the ${ordinal(period)} period?`)) onEnd();
-        }}
-      >
-        End {ordinal(period)}
-      </button>
     </div>
   );
 }
@@ -549,8 +521,6 @@ function GoalSheet({
     </Sheet>
   );
 }
-
-const ordinal = (n: number): string => ['0th', '1st', '2nd', '3rd', '4th'][n] ?? `${n}th`;
 
 /** Human-readable line for the event log. Narrows on the discriminated union. */
 function describe(e: GameEvent, nameOf: (id: string) => { name: string } | undefined): string {

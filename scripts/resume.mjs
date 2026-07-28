@@ -61,15 +61,15 @@ await page.waitForSelector('text=Starting lineup');
 await page.click('text=Fill rest');
 await page.waitForTimeout(200);
 await page.click('text=Start game');
-await page.waitForSelector('text=Start 1st half');
-await page.click('text=Start 1st half');
-await page.waitForSelector('text=Stop clock');
+await page.waitForSelector('[aria-label="Start clock"]');
+await page.click('[aria-label="Start clock"]');
+await page.waitForSelector('[aria-label="Stop clock"]');
 await page.waitForTimeout(2000);
 
-const before = secs(await page.locator('.livebar .time').innerText());
+const before = secs(await page.locator('.gclock .time').innerText());
 
 // Leave the way a coach actually would: back out to the team screen.
-await page.click('.back');
+await page.click('[aria-label="Back"]');
 await page.waitForSelector('text=Roster · 6');
 check('a live game is listed as LIVE', await page.locator('text=LIVE').count(), 1);
 
@@ -95,9 +95,9 @@ await fresh.waitForSelector('text=Roster · 6');
 // Tapping the live game must land on the live screen, not setup.
 await fresh.click('.prow:has-text("vs Away")');
 await fresh.waitForSelector('.pitch', { timeout: 5000 });
-check('reopens on the live screen', await fresh.locator('text=Stop clock').count(), 1);
+check('reopens on the live screen', await fresh.locator('[aria-label="Stop clock"]').count(), 1);
 
-const after = secs(await fresh.locator('.livebar .time').innerText());
+const after = secs(await fresh.locator('.gclock .time').innerText());
 // The clock is derived from timestamps rather than ticked, so it must reflect
 // the wall time that passed while the app was not even loaded.
 check('clock kept running while the app was closed', after - before >= AWAY_MS / 1000, true);
@@ -113,7 +113,7 @@ check(
 
 // And it must still be substitutable, not just readable.
 await fresh.click('.token:not(.vacant) >> nth=0');
-await fresh.click('.benchstrip .bplayer >> nth=0');
+await fresh.click('.benchgrid .bplayer >> nth=0');
 await fresh.click('text=/^Sub 1 ↔ 1$/');
 await fresh.waitForTimeout(400);
 check(
