@@ -2,10 +2,25 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { Screen, Sheet } from '../components';
 import { db } from '../db';
-import type { Formation } from '../formations';
+import type { Formation, Role, Slot } from '../formations';
 import { defaultFormation, presetsFor } from '../formations';
 import { Pitch } from '../Pitch';
 import { navigate } from '../router';
+
+const ROLES: Role[] = ['GK', 'D', 'M', 'F'];
+
+/**
+ * A code unique among the *other* slots. Mirrors the collision guard in
+ * `buildFormation` — codes are how the engine and the position-minutes report
+ * tell slots apart, so two slots sharing one silently merges them.
+ */
+function uniqueCode(slots: Slot[], code: string, exceptId?: string): string {
+  const taken = new Set(slots.filter((s) => s.id !== exceptId).map((s) => s.code));
+  if (!taken.has(code)) return code;
+  let n = 2;
+  while (taken.has(`${code}${n}`)) n++;
+  return `${code}${n}`;
+}
 
 /**
  * Pick a shape and squad size, then drag any position to where you actually want
@@ -25,6 +40,9 @@ export function FormationScreen({ teamId, gameId }: { teamId?: string; gameId?: 
   const [size, setSize] = useState<number | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
+  const [editingSlot, setEditingSlot] = useState<Slot | null>(null);
+  const [editCode, setEditCode] = useState('');
+  const [editRole, setEditRole] = useState<Role>('M');
 
   useEffect(() => {
     if (target && !draft) {
@@ -60,6 +78,53 @@ export function FormationScreen({ teamId, gameId }: { teamId?: string; gameId?: 
     setDraft((f) =>
       f ? { ...f, slots: f.slots.map((s) => (s.id === slotId ? { ...s, x, y } : s)) } : f,
     );
+
+  /*
+   * A preset is a starting point, not a ceiling — a coach whose team plays a
+   * shape no preset covers builds it from here: add a slot, drag it where it
+   * belongs, tap it to give it a real code and line. New slots land spread
+   * across the middle third rather than stacked on one point, so there is
+   * something to drag apart from the first tap.
+   */
+  const addSlot = () => {
+    const n = draft.slots.length + 1;
+    const code = uniqueCode(draft.slots, `P${n}`);
+    const spread = ((n * 37) % 100) / 100;
+    const slot: Slot = {
+      id: `custom-${Date.now()}-${n}`,
+      code,
+      role: 'M',
+      x: 0.2 + spread * 0.6,
+      y: 0.5,
+    };
+    const slots = [...draft.slots, slot];
+    setDraft({ ...draft, slots });
+    setSize(slots.length);
+  };
+
+  const openSlotEditor = (slot: Slot) => {
+    setEditCode(slot.code);
+    setEditRole(slot.role);
+    setEditingSlot(slot);
+  };
+
+  const saveSlotEdit = () => {
+    if (!editingSlot) return;
+    const code = uniqueCode(draft.slots, editCode.trim() || editingSlot.code, editingSlot.id);
+    const slots = draft.slots.map((s) =>
+      s.id === editingSlot.id ? { ...s, code, role: editRole } : s,
+    );
+    setDraft({ ...draft, slots });
+    setEditingSlot(null);
+  };
+
+  const removeSlot = () => {
+    if (!editingSlot || draft.slots.length <= 1) return;
+    const slots = draft.slots.filter((s) => s.id !== editingSlot.id);
+    setDraft({ ...draft, slots });
+    setSize(slots.length);
+    setEditingSlot(null);
+  };
 
   const save = async () => {
     const config = {
@@ -118,11 +183,20 @@ export function FormationScreen({ teamId, gameId }: { teamId?: string; gameId?: 
         >
           Rename…
         </button>
+        <button className="chip" onClick={addSlot}>
+          + Add position
+        </button>
       </div>
 
-      <Pitch formation={draft} occupants={new Map()} onSlotMove={move} />
+      <Pitch
+        formation={draft}
+        occupants={new Map()}
+        onSlotMove={move}
+        onSlotTap={(slot) => openSlotEditor(slot)}
+      />
       <p className="small muted">
-        Drag any position to move it. Pick a preset above to start over.
+        Drag any position to move it, or tap one to rename it, change its line,
+        or remove it. Pick a preset above to start over.
         {gameId
           ? ' This applies to this game only — the team keeps its own shape.'
           : ' Saved with the team and used for every new game.'}
@@ -145,6 +219,46 @@ export function FormationScreen({ teamId, gameId }: { teamId?: string; gameId?: 
               }}
             >
               Rename
+            </button>
+          </div>
+        </Sheet>
+      )}
+
+      {editingSlot && (
+        <Sheet title={`Edit ${editingSlot.code}`} onClose={() => setEditingSlot(null)}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <label className="field">
+              <span>Code, shown on the shirt</span>
+              <input
+                autoFocus
+                value={editCode}
+                onChange={(e) => setEditCode(e.target.value.toUpperCase().slice(0, 5))}
+                placeholder="SW"
+              />
+            </label>
+            <label className="field">
+              <span>Line</span>
+              <div className="chips">
+                {ROLES.map((r) => (
+                  <button
+                    key={r}
+                    className={`chip${editRole === r ? ' sel' : ''}`}
+                    onClick={() => setEditRole(r)}
+                  >
+                    {r === 'GK' ? 'Keeper' : r === 'D' ? 'Defence' : r === 'M' ? 'Midfield' : 'Forward'}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <button className="btn primary block" onClick={saveSlotEdit}>
+              Save
+            </button>
+            <button
+              className="btn danger block"
+              disabled={draft.slots.length <= 1}
+              onClick={removeSlot}
+            >
+              {draft.slots.length <= 1 ? "Can't remove the only position" : 'Remove this position'}
             </button>
           </div>
         </Sheet>

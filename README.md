@@ -1,4 +1,4 @@
-# Sub Time
+# Touchline
 
 Playing time, substitutions, and stats for youth soccer. An offline-first PWA
 you install on your phone and run from the sideline.
@@ -10,7 +10,7 @@ you install on your phone and run from the sideline.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # engine tests: 34, incl. ~3,000 generated games
+npm test           # engine tests: 46, incl. ~3,000 generated games
 npm run typecheck
 npm run build      # app/dist — a static bundle, deploy anywhere
 ```

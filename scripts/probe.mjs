@@ -8,7 +8,7 @@ const ctx = await b.newContext({ viewport: { width: W, height: H }, deviceScaleF
 const p = await ctx.newPage();
 p.on('dialog', (d) => d.accept());
 await p.goto(URL);
-await p.waitForSelector('text=Sub Time');
+await p.waitForSelector('text=Touchline');
 await p.click('text=+ New team');
 await p.fill('input[placeholder="Thunder"]', 'T');
 await p.selectOption('.sheet select', String(SIZE));

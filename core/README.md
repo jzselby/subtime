@@ -1,4 +1,4 @@
-# @subtime/core
+# @touchline/core
 
 The game engine: event log, reducer, stint fold, and derived stats. No React, no
 database, no platform APIs — the same code runs in the PWA, in tests, and
@@ -8,7 +8,7 @@ See [`../DESIGN.md`](../DESIGN.md) for why it is built this way.
 
 ```bash
 npm install
-npm test          # 34 tests, including ~3,000 generated games
+npm test          # 46 tests, including ~3,000 generated games
 npm run typecheck
 npm run build
 ```
@@ -19,7 +19,7 @@ A game is an **immutable, append-only event log**. Everything else is derived by
 folding it. Nothing ticks; no counter is ever incremented in place.
 
 ```ts
-import { reduce, appendEvent, playerStats, fairness, defaultConfig } from '@subtime/core';
+import { reduce, appendEvent, playerStats, fairness, defaultConfig } from '@touchline/core';
 
 const config = defaultConfig({
   periods: { count: 2, lengthMs: 30 * 60_000, fieldPlayers: 9 },
@@ -51,8 +51,10 @@ const event = appendEvent(state, {
    converted into a clock position.
 
 2. **The clock is per-period and restarts at zero.** Stints carry their period, so
-   the arithmetic never deals in cumulative offsets. `displayClockMs` gives the
-   continuous 45:00+ reading for the UI.
+   the arithmetic never deals in cumulative offsets. There is deliberately no
+   continuous-clock helper: periods do not reliably run their configured length,
+   so the only honest running total is `elapsedGameMs`, the sum of what was
+   actually played.
 
 A consequence worth internalising: because stints live in game-clock coordinates,
 **clock pauses are invisible to them**. Stoppage time is excluded from playing

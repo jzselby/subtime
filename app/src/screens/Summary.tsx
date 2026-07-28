@@ -1,4 +1,4 @@
-import { elapsedGameMs, fairnessIndex, formatClock, playerStats } from '@subtime/core';
+import { elapsedGameMs, fairnessIndex, formatClock, playerStats } from '@touchline/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 import { HoldButton, mins, mmss, Screen, Sheet } from '../components';

@@ -53,7 +53,7 @@ await page.addInitScript(() => {
 });
 
 await page.goto(URL);
-await page.waitForSelector('text=Sub Time');
+await page.waitForSelector('text=Touchline');
 
 // -- a game with something worth exporting ---------------------------------
 await page.click('text=+ New team');

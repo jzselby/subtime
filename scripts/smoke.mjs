@@ -53,7 +53,7 @@ page.on('console', (msg) => {
 
 console.log(`\nDriving ${URL}\n`);
 await page.goto(URL);
-await page.waitForSelector('text=Sub Time');
+await page.waitForSelector('text=Touchline');
 
 // -- team ------------------------------------------------------------------
 await page.click('text=+ New team');

@@ -1,5 +1,5 @@
 /**
- * @subtime/core — the game engine.
+ * @touchline/core — the game engine.
  *
  * Framework-free on purpose. Nothing in here imports React, a database, or a
  * platform API, so the same code runs in the PWA, in tests, and server-side when

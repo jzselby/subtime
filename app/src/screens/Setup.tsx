@@ -1,4 +1,4 @@
-import type { PlayerSlot } from '@subtime/core';
+import type { PlayerSlot } from '@touchline/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { minutesOf, Screen, Sheet } from '../components';
@@ -159,20 +159,12 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       footer={
         <div className="actions">
           {/*
-           * The one-tap action that solves this whole screen used to be the
-           * quiet grey button, while the loudest, greenest element was a
-           * disabled restatement of the heading above it ("Pick 9 more") —
-           * readable at about 2:1 contrast and not a control at all. Fill rest
-           * is now what the eye lands on; Start game is a stable target that
-           * says the same thing throughout instead of counting down.
+           * Fill rest used to share this bar with Start game — two big buttons
+           * for what is really one decision and a shortcut toward it. It moved
+           * up next to the heading it actually describes (paralleling "Bench ·
+           * N — M of N here ›" just below), so the footer is the one thing a
+           * coach is actually deciding: is the lineup done.
            */}
-          <button
-            className={`btn${filled < needed ? ' primary' : ''}`}
-            disabled={filled >= needed}
-            onClick={autoFill}
-          >
-            Fill rest
-          </button>
           <button
             className={`btn lg${filled >= needed && needed > 0 ? ' primary' : ''}`}
             disabled={filled < needed || needed === 0}
@@ -183,7 +175,12 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         </div>
       }
     >
-      <h2>Starting lineup · {filled} of {needed}</h2>
+      <div className="row spread">
+        <h2 style={{ margin: 0 }}>Starting lineup · {filled} of {needed}</h2>
+        <button className="btn ghost small" disabled={filled >= needed} onClick={autoFill}>
+          Fill rest
+        </button>
+      </div>
       <div className="pitchwrap">
         <Pitch
           formation={formation}

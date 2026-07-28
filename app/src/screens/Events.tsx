@@ -1,5 +1,5 @@
-import type { GameEvent } from '@subtime/core';
-import { formatClock } from '@subtime/core';
+import type { GameEvent } from '@touchline/core';
+import { formatClock } from '@touchline/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 import { periodTag, Screen, Sheet } from '../components';

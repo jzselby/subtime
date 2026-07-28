@@ -1,5 +1,5 @@
-import type { EventInput, GameConfig, GameEvent, GameState, ReduceResult } from '@subtime/core';
-import { appendEvent, reduce } from '@subtime/core';
+import type { EventInput, GameConfig, GameEvent, GameState, ReduceResult } from '@touchline/core';
+import { appendEvent, reduce } from '@touchline/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db } from './db';

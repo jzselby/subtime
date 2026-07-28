@@ -1,5 +1,5 @@
 {
-  "name": "@subtime/app",
+  "name": "@touchline/app",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@subtime/core": "*",
+    "@touchline/core": "*",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^1.1.7",
     "react": "^18.3.1",

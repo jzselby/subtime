@@ -1,5 +1,5 @@
-import type { GameConfig, GameEvent } from '@subtime/core';
-import { appearsInLog, defaultConfig, reduce } from '@subtime/core';
+import type { GameConfig, GameEvent } from '@touchline/core';
+import { appearsInLog, defaultConfig, reduce } from '@touchline/core';
 import Dexie, { type EntityTable } from 'dexie';
 import type { Formation } from './formations';
 import { defaultFormation } from './formations';
@@ -45,13 +45,18 @@ export interface Game {
   createdAt: number;
 }
 
-export class SubTimeDb extends Dexie {
+export class TouchlineDb extends Dexie {
   teams!: EntityTable<Team, 'id'>;
   players!: EntityTable<Player, 'id'>;
   games!: EntityTable<Game, 'id'>;
   events!: EntityTable<GameEvent, 'id'>;
 
   constructor() {
+    // The literal database name, not the class above it: an existing install's
+    // data lives under this exact string in the browser's IndexedDB. Renaming
+    // it here would not migrate anything — Dexie would just open a second,
+    // empty database beside the one a coach's games are already in — so this
+    // stays 'subtime' regardless of what the product is called today.
     super('subtime');
     this.version(1).stores({
       teams: 'id, name, createdAt',
@@ -90,7 +95,7 @@ export class SubTimeDb extends Dexie {
   }
 }
 
-export const db = new SubTimeDb();
+export const db = new TouchlineDb();
 
 export const uid = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;

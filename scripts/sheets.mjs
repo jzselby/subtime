@@ -61,7 +61,7 @@ const sheetIsClickable = async (label) => {
 };
 
 await page.goto(URL);
-await page.waitForSelector('text=Sub Time');
+await page.waitForSelector('text=Touchline');
 
 await page.click('text=+ New team');
 await page.fill('input[placeholder="Thunder"]', 'Sheet FC');

@@ -1,5 +1,5 @@
-import type { GameEvent, PlayerSlot } from '@subtime/core';
-import { clockAt, fairness, formatClock, playerStats } from '@subtime/core';
+import type { GameEvent, PlayerSlot } from '@touchline/core';
+import { clockAt, fairness, formatClock, playerStats } from '@touchline/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {

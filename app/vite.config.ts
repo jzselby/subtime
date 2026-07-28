@@ -11,7 +11,7 @@ export default defineConfig({
     alias: {
       // Point at core's source, not its build output, so `npm run dev` needs no
       // separate build step and edits to the engine hot-reload.
-      '@subtime/core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
+      '@touchline/core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
     },
   },
   plugins: [
@@ -24,8 +24,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
       },
       manifest: {
-        name: 'Sub Time',
-        short_name: 'Sub Time',
+        name: 'Touchline',
+        short_name: 'Touchline',
         description: 'Playing time, substitutions, and stats for youth soccer.',
         theme_color: '#0f1720',
         background_color: '#0f1720',

@@ -51,9 +51,18 @@ const CODES: Record<string, Record<number, string[]>> = {
   F: { 1: ['ST'], 2: ['LS', 'RS'], 3: ['LW', 'ST', 'RW'] },
 };
 
-function bandFor(lineIndex: number, lineCount: number): keyof typeof CODES {
+function bandFor(lineIndex: number, lineCount: number, width: number): keyof typeof CODES {
   if (lineIndex === 0) return 'D';
   if (lineIndex === lineCount - 1) return 'F';
+  /*
+   * A middle line four or more wide spans the pitch and reads as a flat
+   * midfield regardless of depth — 4-1-4-1's second line, 3-4-1-2's second
+   * line. The DM/AM tables only go up to three, so without this a wide middle
+   * line fell back to numbered codes ("AM1".."AM4"); the M table already
+   * covers up to five. Narrower middle lines (1-3) keep the depth-based
+   * DM/AM split unchanged — those already have real position codes.
+   */
+  if (lineCount >= 4 && width >= 4) return 'M';
   if (lineCount >= 4) return lineIndex === 1 ? 'DM' : 'AM';
   return 'M';
 }
@@ -133,7 +142,7 @@ export function buildFormation(name: string, lines: number[], gk = true): Format
 
   lines.forEach((count, lineIndex) => {
     const y = rowY(lineIndex + (gk ? 1 : 0));
-    const band = bandFor(lineIndex, lines.length);
+    const band = bandFor(lineIndex, lines.length, count);
     const codes = codesFor(band, count);
     const role = ROLE_OF[band] ?? 'M';
 
@@ -181,33 +190,44 @@ const SPECS: Record<number, PresetSpec[]> = {
     { lines: [2, 2] },
     { lines: [1, 2, 1] },
     { lines: [2, 1, 1] },
+    { lines: [1, 1, 2] },
   ],
   6: [
     { lines: [2, 1, 2] },
     { lines: [3, 2] },
     { lines: [2, 3] },
+    { lines: [1, 3, 1] },
   ],
   7: [
     { lines: [2, 3, 1] },
     { lines: [3, 2, 1] },
     { lines: [2, 1, 2, 1] },
     { lines: [3, 1, 2] },
+    { lines: [2, 2, 2] },
+    { lines: [1, 4, 1] },
   ],
   8: [
     { lines: [3, 3, 1] },
     { lines: [2, 3, 2] },
     { lines: [3, 2, 2] },
+    { lines: [2, 4, 1] },
+    { lines: [3, 1, 3] },
   ],
   9: [
     { lines: [3, 2, 3] },
     { lines: [3, 3, 2] },
     { lines: [2, 3, 3] },
     { lines: [3, 4, 1] },
+    { lines: [2, 4, 2] },
+    { lines: [3, 3, 1, 1] },
   ],
   10: [
     { lines: [3, 3, 3] },
     { lines: [4, 3, 2] },
     { lines: [3, 4, 2] },
+    { lines: [4, 4, 1] },
+    { lines: [2, 4, 3] },
+    { lines: [4, 2, 3] },
   ],
   11: [
     { lines: [4, 4, 2] },
@@ -215,6 +235,12 @@ const SPECS: Record<number, PresetSpec[]> = {
     { lines: [4, 2, 3, 1] },
     { lines: [3, 5, 2] },
     { lines: [5, 3, 2] },
+    { lines: [4, 5, 1] },
+    { lines: [3, 4, 3] },
+    { lines: [4, 1, 4, 1] },
+    { lines: [4, 3, 2, 1] },
+    { lines: [3, 4, 1, 2] },
+    { lines: [5, 4, 1] },
   ],
 };
 

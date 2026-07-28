@@ -1,4 +1,4 @@
-import type { GameEvent } from '@subtime/core';
+import type { GameEvent } from '@touchline/core';
 
 /** Human-readable line for an event. Narrows on the discriminated union. */
 export function describeEvent(

@@ -1,4 +1,4 @@
-import { formatClock } from '@subtime/core';
+import { formatClock } from '@touchline/core';
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';

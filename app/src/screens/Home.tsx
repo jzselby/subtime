@@ -21,7 +21,7 @@ export function HomeScreen() {
   };
 
   return (
-    <Screen title="Sub Time" subtitle="Playing time, subs, and stats">
+    <Screen title="Touchline" subtitle="Playing time, subs, and stats">
       {teams?.length === 0 && (
         <div className="empty">
           No teams yet.
