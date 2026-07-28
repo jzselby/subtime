@@ -139,6 +139,25 @@ main {
   -webkit-overflow-scrolling: touch;
 }
 
+/*
+ * Flex children shrink by default. On a scrolling screen that silently squashed
+ * cards — the stats table collapsed to a sliver of its header rather than
+ * letting the page scroll. Nothing in a screen body shrinks unless it asks to.
+ */
+main > * {
+  flex: none;
+}
+
+main > .pitchwrap,
+main > .pane {
+  flex: 1;
+  min-height: 0;
+}
+
+main > .chipscroll {
+  flex: 0 1 auto;
+}
+
 /* Game screen: nothing scrolls, the pitch takes whatever room is left. */
 main.fill {
   overflow: hidden;
@@ -1157,4 +1176,43 @@ label.field > span {
   color: #2a1c02;
   font-size: 12px;
   font-weight: 800;
+}
+
+/* --------------------------------------------------------- drag to sub -- */
+
+/*
+ * Follows the finger. pointer-events:none so the drop hit-test underneath it
+ * sees the pitch rather than the thing being dragged.
+ *
+ * Not `.ghost` — that name was already taken by the ghost *button* variant
+ * (.btn.ghost), and reusing it turned every Close and Cancel into a circle.
+ */
+.dragavatar {
+  position: fixed;
+  z-index: 50;
+  transform: translate(-50%, -50%) scale(1.15);
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #eafff6;
+  color: #06231a;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* Where it would land. */
+.token.drop .shirt {
+  border-color: #eafff6;
+  box-shadow: 0 0 0 4px rgba(234, 255, 246, 0.35);
+  transform: scale(1.12);
+}
+
+.bplayer {
+  touch-action: none;
 }

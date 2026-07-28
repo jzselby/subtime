@@ -58,9 +58,14 @@ with no browser chrome eating the pitch.
 1. Add a team — pick your format (4v4 up to 11v11) when you create it.
 2. Add the roster.
 3. **Team → Settings → Formation** to choose a shape and drag positions where you
-   actually play them.
+   actually play them. That's the default for new games.
 4. New game → mark who is here → tap positions on the pitch to fill them (or
    **Fill rest**) → **Start**.
+
+**Tournaments and odd fixtures:** on a game's setup screen, **Setup** sets the
+periods, their length, and the formation **for that game only**. A Saturday of
+four 8-minute quarters at 6v6 doesn't touch what the team plays the rest of the
+season.
 
 It works with no signal. Everything lives on the device.
 
@@ -80,9 +85,13 @@ Every shirt shows number, name, and minutes played. (On a small phone the pitch
 drops the name and keeps number and minutes — three lines of label per player is
 what makes rows collide.) The formation is captioned top-left.
 
-- **Two taps to sub:** a player on the pitch, then a player on the bench strip
-  underneath. Both take multiple selections, so a four-player change at a
-  stoppage is one action. The incoming player inherits the position.
+- **Drag to sub.** Drag a shirt from the bench onto a player to swap them, onto
+  an empty position to fill it, or drag someone off the pitch onto the bench to
+  take them off. Dragging one player onto another trades their positions. Drops
+  snap to the nearest position, so they don't have to be precise.
+- **Or tap twice**, if you prefer: a player on the pitch, then one on the bench.
+  Both take multiple selections, so a four-player change at a stoppage is one
+  action. The incoming player inherits the position.
 - **The bench is ordered by who is owed the most time**, so the leftmost shirt is
   always the app's suggestion. The ring colour says the same thing without numbers.
 - **Tap an empty position** to fill it from the bench. Or select one player on the
@@ -100,8 +109,8 @@ keeper weighting · **a field view with a shirt per position** plus a list view 
 live clock with stoppages · subs and position changes · goals, assists, and
 opponent goals · live fairness ordering and sub suggestions · shift alarm · undo
 and a full event log · per-game report with playing-time bars, a who-was-on-when
-timeline, plus/minus and position variety · copy-to-clipboard summary and CSV
-export · installable, offline, survives a reload mid-game.
+timeline, plus/minus and **minutes in each position by name** · copy-to-clipboard
+summary and CSV export · installable, offline, survives a reload mid-game.
 
 ### Formations
 
@@ -138,6 +147,7 @@ npm run build --workspace app             # then, in another shell:
 npx vite preview --port 4173 --workspace app
 node scripts/smoke.mjs                    # drives a whole game in a real browser
 node scripts/resume.mjs                   # leaves mid-game and comes back
+node scripts/drag.mjs                     # drag-to-sub, as real pointer gestures
 node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 ```
 
@@ -150,6 +160,11 @@ screenshots to `scripts/shots/`. Pass `--headed` to watch either script.
 it starts a game, closes the tab entirely, waits, and reopens. Game time must
 have kept accruing across the gap — it is derived from timestamps, not ticked —
 and the app must land back on the live screen, still substitutable.
+
+`scripts/drag.mjs` performs each of the four drops as a genuine press-move-release
+and checks the resulting squad, plus that a press without movement is still a tap.
+It caught a drop that also fired the tap handler underneath it and left a sheet
+covering the pitch.
 
 `scripts/checkfit.mjs` runs the game screen at three phone sizes × three squad sizes and
 asserts the page does not scroll, the whole pitch is on screen, and **no two

@@ -148,4 +148,4 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
 const Dexie_MIN = -Infinity;
 const Dexie_MAX = Infinity;
 
-export type { GameState };
+export type { EventInput, GameState };

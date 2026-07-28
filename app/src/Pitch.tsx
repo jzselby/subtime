@@ -84,6 +84,8 @@ export function Pitch({
   selected,
   onSlotTap,
   onSlotMove,
+  onTokenPointerDown,
+  dropSlotId,
   compact,
   children,
 }: {
@@ -94,6 +96,10 @@ export function Pitch({
   onSlotTap?: (slot: Slot, occupant: Occupant | undefined) => void;
   /** Supply to make slots draggable — this is what turns it into an editor. */
   onSlotMove?: (slotId: string, x: number, y: number) => void;
+  /** Supply to let a *player* be dragged off their position (live game). */
+  onTokenPointerDown?: (slot: Slot, occupant: Occupant | undefined, e: ReactPointerEvent) => void;
+  /** Slot currently under a drag, highlighted as the drop target. */
+  dropSlotId?: string | null;
   compact?: boolean;
   children?: ReactNode;
 }) {
@@ -128,12 +134,17 @@ export function Pitch({
     };
   }, []);
 
-  const onPointerDown = (slot: Slot) => (e: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!onSlotMove) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDragging(slot.id);
-    moved.current = false;
-  };
+  const onPointerDown =
+    (slot: Slot, occupant: Occupant | undefined) => (e: ReactPointerEvent<HTMLButtonElement>) => {
+      // Editor mode drags the position itself; live mode drags the player in it.
+      if (onSlotMove) {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        setDragging(slot.id);
+        moved.current = false;
+        return;
+      }
+      if (occupant) onTokenPointerDown?.(slot, occupant, e);
+    };
 
   const onPointerMove = (slot: Slot) => (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (!onSlotMove || dragging !== slot.id) return;
@@ -161,11 +172,12 @@ export function Pitch({
           <button
             key={slot.id}
             type="button"
+            data-slot={slot.id}
             className={`token${occupant ? '' : ' vacant'}${isSelected ? ' picked' : ''}${
               dragging === slot.id ? ' dragging' : ''
-            }`}
+            }${dropSlotId === slot.id ? ' drop' : ''}`}
             style={{ left: `${slot.x * 100}%`, top: `${slot.y * 100}%` }}
-            onPointerDown={onPointerDown(slot)}
+            onPointerDown={onPointerDown(slot, occupant)}
             onPointerMove={onPointerMove(slot)}
             onPointerUp={onPointerUp(slot, occupant)}
             aria-label={

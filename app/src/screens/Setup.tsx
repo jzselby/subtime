@@ -1,8 +1,8 @@
 import type { PlayerSlot } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Screen, Sheet } from '../components';
-import { db, deleteGame } from '../db';
+import { db, deleteGame, type Game } from '../db';
 import { useGameLog } from '../hooks';
 import type { Occupant } from '../Pitch';
 import { Pitch } from '../Pitch';
@@ -19,6 +19,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
   /** slot id → player id */
   const [lineup, setLineup] = useState<Record<string, string>>({});
   const [picking, setPicking] = useState<string | null>(null);
+  const [settings, setSettings] = useState(false);
 
   const { recordMany } = useGameLog(gameId, game?.config ?? DEFAULT_CFG);
 
@@ -30,6 +31,20 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       ),
     [players],
   );
+
+  /*
+   * The lineup is keyed by slot id, so a formation change invalidates it —
+   * different shape, different slots. Drop any assignment whose slot no longer
+   * exists rather than leaving players attached to positions that are gone.
+   */
+  const slotIds = game?.formation.slots.map((s) => s.id).join(',') ?? '';
+  useEffect(() => {
+    const valid = new Set(slotIds.split(','));
+    setLineup((l) => {
+      const next = Object.fromEntries(Object.entries(l).filter(([slot]) => valid.has(slot)));
+      return Object.keys(next).length === Object.keys(l).length ? l : next;
+    });
+  }, [slotIds]);
 
   if (!game) return <Screen title="Loading…">{null}</Screen>;
 
@@ -83,15 +98,8 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       fill
       onBack={() => navigate({ name: 'team', teamId: game.teamId })}
       action={
-        <button
-          className="btn ghost"
-          onClick={() => {
-            if (confirm('Delete this game?')) {
-              void deleteGame(gameId).then(() => navigate({ name: 'team', teamId: game.teamId }));
-            }
-          }}
-        >
-          Delete
+        <button className="btn ghost" onClick={() => setSettings(true)}>
+          Setup
         </button>
       }
       footer={
@@ -160,6 +168,10 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         )}
       </div>
 
+      {settings && (
+        <MatchSettings game={game} gameId={gameId} onClose={() => setSettings(false)} />
+      )}
+
       {picking && (
         <Sheet
           title={`${formation.slots.find((s) => s.id === picking)?.code ?? ''} — pick a player`}
@@ -204,6 +216,98 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         </Sheet>
       )}
     </Screen>
+  );
+}
+
+/**
+ * Per-game match settings.
+ *
+ * Deliberately a copy of the team's, not a reference to it: tournaments run
+ * short halves and odd squad sizes, and a Saturday of 6v6 must not rewrite what
+ * the team plays for the rest of the season.
+ */
+function MatchSettings({
+  game,
+  gameId,
+  onClose,
+}: {
+  game: Game;
+  gameId: string;
+  onClose: () => void;
+}) {
+  const [periods, setPeriods] = useState(game.config.periods.count);
+  const [lengthMin, setLengthMin] = useState(Math.round(game.config.periods.lengthMs / 60_000));
+  const [opponent, setOpponent] = useState(game.opponent);
+
+  const save = async () => {
+    await db.games.update(gameId, {
+      opponent: opponent.trim(),
+      config: {
+        ...game.config,
+        periods: { ...game.config.periods, count: periods, lengthMs: lengthMin * 60_000 },
+      },
+    });
+    onClose();
+  };
+
+  return (
+    <Sheet title="This game" onClose={onClose}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <label className="field">
+          <span>Opponent</span>
+          <input value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Rovers" />
+        </label>
+
+        <div className="row">
+          <label className="field grow">
+            <span>Periods</span>
+            <select value={periods} onChange={(e) => setPeriods(Number(e.target.value))}>
+              <option value={1}>1</option>
+              <option value={2}>2 halves</option>
+              <option value={3}>3</option>
+              <option value={4}>4 quarters</option>
+            </select>
+          </label>
+          <label className="field grow">
+            <span>Minutes each</span>
+            <input
+              type="number"
+              min={1}
+              value={lengthMin}
+              onChange={(e) => setLengthMin(Math.max(1, Number(e.target.value)))}
+              inputMode="numeric"
+            />
+          </label>
+        </div>
+
+        <button
+          className="btn block"
+          onClick={() => {
+            void save().then(() => navigate({ name: 'gameFormation', gameId }));
+          }}
+        >
+          Formation: {game.formation.name} · {game.formation.slots.length} a side ›
+        </button>
+
+        <p className="small muted" style={{ marginTop: -6 }}>
+          These apply to this game only. The team's own defaults are untouched.
+        </p>
+
+        <button className="btn primary block" onClick={() => void save()}>
+          Save
+        </button>
+        <button
+          className="btn danger block"
+          onClick={() => {
+            if (confirm('Delete this game?')) {
+              void deleteGame(gameId).then(() => navigate({ name: 'team', teamId: game.teamId }));
+            }
+          }}
+        >
+          Delete game
+        </button>
+      </div>
+    </Sheet>
   );
 }
 

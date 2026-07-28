@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { beep, heatColor, mmss, PlayerRow, Sheet } from '../components';
 import { db } from '../db';
 import { codesOf } from '../formations';
+import type { EventInput } from '../hooks';
 import { useGameLog, useNow, useWakeLock } from '../hooks';
 import type { Occupant } from '../Pitch';
 import { Pitch } from '../Pitch';
@@ -37,7 +38,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   );
 
   const config = game?.config ?? DEFAULT_CFG;
-  const { state, errors, events, record, undo } = useGameLog(gameId, config);
+  const { state, errors, events, record, recordMany, undo } = useGameLog(gameId, config);
 
   const running = state.status === 'running';
   const now = useNow(running);
@@ -49,6 +50,17 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | null>(null);
   const [movingPlayer, setMovingPlayer] = useState<string | null>(null);
   const [fillingSlot, setFillingSlot] = useState<string | null>(null);
+
+  /*
+   * Drag-to-sub. The authoritative drag lives in a ref because the window
+   * pointer handlers need to read it synchronously; `ghost` exists only to
+   * re-render the thing following your finger.
+   */
+  const dragRef = useRef<{ playerId: string; from: 'bench' | string; active: boolean } | null>(null);
+  const [ghost, setGhost] = useState<{ x: number; y: number; label: string } | null>(null);
+  const [dropSlotId, setDropSlotId] = useState<string | null>(null);
+  // A completed drag must not also fire the tap-to-select handler underneath it.
+  const draggedRef = useRef(false);
 
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
@@ -72,6 +84,23 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const onFieldRows = rows.filter((r) => r.onField);
   const benchRows = rows.filter((r) => !r.onField);
   const clock = clockAt(state, now);
+
+  /*
+   * Drop anyone from a selection the moment they change sides. A selection that
+   * outlives its player is not harmless: "take this one off" still pointing at
+   * someone already on the bench turned a tap on an empty shirt into a position
+   * change for a player who was not on the field.
+   */
+  const onFieldKey = [...state.onField.keys()].sort().join(',');
+  useEffect(() => {
+    const on = new Set(onFieldKey ? onFieldKey.split(',') : []);
+    const prune = (keep: (id: string) => boolean) => (prev: Set<string>) => {
+      const next = new Set([...prev].filter(keep));
+      return next.size === prev.size ? prev : next;
+    };
+    setPickedOff(prune((id) => on.has(id)));
+    setPickedOn(prune((id) => !on.has(id)));
+  }, [onFieldKey]);
 
   // Shift alarm: nudge when it has been a while since the last change.
   const lastSubClock = useMemo(() => {
@@ -141,11 +170,120 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   };
 
   const toggle = (set: Set<string>, id: string, apply: (s: Set<string>) => void) => {
+    if (draggedRef.current) return;
     const next = new Set(set);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     apply(next);
   };
+
+  /** Slot nearest a screen point, so a drop does not have to be pixel-perfect. */
+  const slotNear = (x: number, y: number): string | null => {
+    const direct = document.elementFromPoint(x, y)?.closest('[data-slot]');
+    if (direct) return direct.getAttribute('data-slot');
+    let best: { id: string; d: number } | null = null;
+    for (const el of document.querySelectorAll('[data-slot]')) {
+      const r = el.getBoundingClientRect();
+      const d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+      if (!best || d < best.d) best = { id: el.getAttribute('data-slot') ?? '', d };
+    }
+    return best && best.d < 90 ? best.id : null;
+  };
+
+  const overBench = (x: number, y: number): boolean =>
+    !!document.elementFromPoint(x, y)?.closest('[data-bench]');
+
+  const drop = async (
+    from: 'bench' | string,
+    playerId: string,
+    x: number,
+    y: number,
+  ): Promise<void> => {
+    const slotId = overBench(x, y) ? null : slotNear(x, y);
+
+    if (from === 'bench') {
+      if (!slotId) return; // dropped nowhere useful
+      const slot = formation.slots.find((s) => s.id === slotId);
+      if (!slot) return;
+      const sitting = occupants.get(slotId);
+      // Onto an occupied shirt is a straight swap; onto an empty one is just on.
+      await record({
+        type: 'SUB',
+        off: sitting ? [sitting.playerId] : [],
+        on: [{ playerId, position: slot.code }],
+      });
+      return;
+    }
+
+    // Dragging someone already on the field.
+    if (overBench(x, y)) {
+      await record({ type: 'SUB', off: [playerId], on: [] });
+      return;
+    }
+    if (!slotId || slotId === from) return;
+    const slot = formation.slots.find((s) => s.id === slotId);
+    if (!slot) return;
+    const sitting = occupants.get(slotId);
+    const fromSlot = formation.slots.find((s) => s.id === from);
+    if (sitting && fromSlot) {
+      // Two players trading places: one batch, so the fold never rests in a
+      // state where both hold the same position code.
+      const swap: EventInput[] = [
+        { type: 'POSITION_CHANGE', playerId, to: slot.code },
+        { type: 'POSITION_CHANGE', playerId: sitting.playerId, to: fromSlot.code },
+      ];
+      await recordMany(swap);
+    } else {
+      await record({ type: 'POSITION_CHANGE', playerId, to: slot.code });
+    }
+  };
+
+  const startDrag =
+    (playerId: string, from: 'bench' | string, label: string) =>
+    (e: { clientX: number; clientY: number }) => {
+      const startX = e.clientX;
+      const startY = e.clientY;
+      dragRef.current = { playerId, from, active: false };
+
+      const onMove = (ev: PointerEvent) => {
+        const d = dragRef.current;
+        if (!d) return;
+        // A few pixels of slop so a tap is still a tap.
+        if (!d.active && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+        d.active = true;
+        /*
+         * Mark the gesture as a drag here, not on release. React's handler on
+         * the element under the pointer fires while pointerup is still
+         * bubbling — before any window listener — so a flag set at drop time
+         * is set too late to suppress the tap, and every bench-to-empty-shirt
+         * drop also opened the "who goes on?" sheet.
+         */
+        draggedRef.current = true;
+        setGhost({ x: ev.clientX, y: ev.clientY, label });
+        setDropSlotId(overBench(ev.clientX, ev.clientY) ? null : slotNear(ev.clientX, ev.clientY));
+      };
+
+      const onUp = (ev: PointerEvent) => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        const d = dragRef.current;
+        dragRef.current = null;
+        setGhost(null);
+        setDropSlotId(null);
+        // Release the tap suppression only once this event has finished
+        // bubbling, so the click that follows pointerup is still swallowed.
+        setTimeout(() => {
+          draggedRef.current = false;
+        }, 0);
+        if (!d?.active) return; // never moved: leave it to the tap handler
+        void drop(d.from, d.playerId, ev.clientX, ev.clientY);
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    };
 
   /**
    * Tapping an empty position does one of two things, whichever the current
@@ -153,6 +291,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
    * to fill it.
    */
   const tapVacant = (slotCode: string, slotId: string) => {
+    // A drag that ends over a vacant shirt still delivers pointerup to it, so
+    // this fires on the tail of every bench→pitch drop unless it is guarded.
+    if (draggedRef.current) return;
     if (pickedOff.size === 1) {
       const playerId = [...pickedOff][0] as string;
       void record({ type: 'POSITION_CHANGE', playerId, to: slotCode });
@@ -244,6 +385,10 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 ? toggle(pickedOff, occupant.playerId, setPickedOff)
                 : tapVacant(slot.code, slot.id)
             }
+            onTokenPointerDown={(slot, occupant, e) =>
+              occupant && startDrag(occupant.playerId, slot.id, occupant.number || occupant.name.slice(0, 2))(e)
+            }
+            dropSlotId={dropSlotId}
           >
             <span className="fname">{formation.name}</span>
             {shiftDue && <span className="shiftpill">Shift due</span>}
@@ -292,7 +437,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       )}
 
       {view === 'field' && (
-        <div className="benchgrid">
+        <div className="benchgrid" data-bench>
           {benchRows.length === 0 ? (
             <p className="small muted">Everyone is on the field.</p>
           ) : (
@@ -302,6 +447,11 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 <button
                   key={row.playerId}
                   className={`bplayer${pickedOn.has(row.playerId) ? ' picked' : ''}`}
+                  onPointerDown={startDrag(
+                    row.playerId,
+                    'bench',
+                    p?.number || p?.name.slice(0, 2) || '?',
+                  )}
                   onClick={() => toggle(pickedOn, row.playerId, setPickedOn)}
                 >
                   <span className="shirt" style={{ borderColor: heatColor(row.deficitMs) }}>
@@ -348,6 +498,12 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           <button className="btn" onClick={() => void undo()} disabled={events.length === 0}>
             ↩ Undo
           </button>
+        </div>
+      )}
+
+      {ghost && (
+        <div className="dragavatar" style={{ left: ghost.x, top: ghost.y }}>
+          {ghost.label}
         </div>
       )}
 

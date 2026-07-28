@@ -22,6 +22,8 @@ export function App() {
       return <TeamScreen key={route.teamId} teamId={route.teamId} />;
     case 'formation':
       return <FormationScreen key={route.teamId} teamId={route.teamId} />;
+    case 'gameFormation':
+      return <FormationScreen key={route.gameId} gameId={route.gameId} />;
     case 'setup':
       return <SetupScreen key={route.gameId} gameId={route.gameId} />;
     case 'live':

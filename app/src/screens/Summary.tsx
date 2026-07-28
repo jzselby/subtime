@@ -38,6 +38,13 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
     [state, now],
   );
 
+  /** "CM 12:30 · LB 8:00", longest spell first. */
+  const byPosition = (msByPosition: Record<string, number>): string =>
+    Object.entries(msByPosition)
+      .sort((a, b) => b[1] - a[1])
+      .map(([code, ms]) => `${code} ${mmss(ms)}`)
+      .join(' · ');
+
   if (!game || !team) return <Screen title="Loading…">{null}</Screen>;
 
   const elapsed = elapsedGameMs(state, now);
@@ -154,8 +161,15 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
           <tbody>
             {byMinutes.map((s) => (
               <tr key={s.playerId}>
-                <td>{nameOf(s.playerId)}</td>
-                <td className="bar" style={{ width: '55%' }}>
+                <td>
+                  {nameOf(s.playerId)}
+                  {s.positionsPlayed > 0 && (
+                    <span className="small muted" style={{ display: 'block' }}>
+                      {byPosition(s.msByPosition)}
+                    </span>
+                  )}
+                </td>
+                <td className="bar" style={{ width: '52%' }}>
                   <span style={{ width: `${(s.playedMs / maxMs) * 100}%` }} />
                   <em>{mmss(s.playedMs)}</em>
                 </td>
@@ -214,7 +228,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
               <th>Player</th>
               <th>Min</th>
               <th>Bench</th>
-              <th>Pos</th>
+              <th>Positions</th>
               <th>G</th>
               <th>A</th>
               <th>+/−</th>
@@ -226,7 +240,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
                 <td>{nameOf(s.playerId)}</td>
                 <td>{mins(s.playedMs)}</td>
                 <td className="muted">{mins(s.benchMs)}</td>
-                <td title={Object.keys(s.msByPosition).join(', ')}>{s.positionsPlayed}</td>
+                <td style={{ textAlign: 'left' }}>{byPosition(s.msByPosition) || '—'}</td>
                 <td>{s.goals || ''}</td>
                 <td>{s.assists || ''}</td>
                 <td className={s.plusMinus > 0 ? '' : s.plusMinus < 0 ? 'muted' : 'muted'}>
@@ -238,8 +252,8 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
         </table>
       </div>
       <p className="small muted">
-        “Pos” is how many different positions a player covered — the development
-        number. “+/−” is the goal difference while they were on.
+        Positions show how long each player spent in each one — the development
+        record. “+/−” is the goal difference while they were on.
       </p>
     </Screen>
   );

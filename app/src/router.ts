@@ -10,6 +10,7 @@ export type Route =
   | { name: 'home' }
   | { name: 'team'; teamId: string }
   | { name: 'formation'; teamId: string }
+  | { name: 'gameFormation'; gameId: string }
   | { name: 'setup'; gameId: string }
   | { name: 'live'; gameId: string }
   | { name: 'summary'; gameId: string };
@@ -23,6 +24,7 @@ export function parseHash(hash: string): Route {
   }
   if (head === 'game' && id) {
     if (tail === 'setup') return { name: 'setup', gameId: id };
+    if (tail === 'formation') return { name: 'gameFormation', gameId: id };
     if (tail === 'summary') return { name: 'summary', gameId: id };
     return { name: 'live', gameId: id };
   }
@@ -37,6 +39,8 @@ export function hashFor(route: Route): string {
       return `#/team/${route.teamId}`;
     case 'formation':
       return `#/team/${route.teamId}/formation`;
+    case 'gameFormation':
+      return `#/game/${route.gameId}/formation`;
     case 'setup':
       return `#/game/${route.gameId}/setup`;
     case 'live':
