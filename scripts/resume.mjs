@@ -40,6 +40,7 @@ await page.waitForSelector('text=Sub Time');
 
 await page.click('text=+ New team');
 await page.fill('input[placeholder="Thunder"]', 'Resume FC');
+await page.selectOption('.sheet select', '5');
 await page.click('text=Create team');
 await page.waitForSelector('text=Roster · 0');
 
@@ -51,27 +52,21 @@ for (const name of ['A', 'B', 'C', 'D', 'E', 'F']) {
 }
 await page.click('.sheet >> text=Close');
 
-await page.click('text=Settings');
-await page.fill('input[type="number"] >> nth=1', '5');
-await page.click('.sheet >> text=Save');
-await page.waitForTimeout(200);
+
 
 await page.click('text=+ New game');
 await page.fill('input[placeholder="Rovers"]', 'Away');
 await page.click('text=Create game');
 await page.waitForSelector('text=Starting lineup');
-for (let slot = 0; slot < 5; slot++) {
-  await page.click(`.plist .prow >> nth=${slot}`);
-  await page.click(`.sheet .chip >> nth=${slot}`);
-  await page.waitForTimeout(30);
-}
+await page.click('text=Fill rest');
+await page.waitForTimeout(200);
 await page.click('text=Start game');
 await page.waitForSelector('text=Start 1st half');
 await page.click('text=Start 1st half');
 await page.waitForSelector('text=Stop clock');
 await page.waitForTimeout(2000);
 
-const before = secs(await page.locator('.clock .time').innerText());
+const before = secs(await page.locator('.livebar .time').innerText());
 
 // Leave the way a coach actually would: back out to the team screen.
 await page.click('.back');
@@ -99,17 +94,17 @@ await fresh.waitForSelector('text=Roster · 6');
 
 // Tapping the live game must land on the live screen, not setup.
 await fresh.click('.prow:has-text("vs Away")');
-await fresh.waitForSelector('text=On the field', { timeout: 5000 });
+await fresh.waitForSelector('.pitch', { timeout: 5000 });
 check('reopens on the live screen', await fresh.locator('text=Stop clock').count(), 1);
 
-const after = secs(await fresh.locator('.clock .time').innerText());
+const after = secs(await fresh.locator('.livebar .time').innerText());
 // The clock is derived from timestamps rather than ticked, so it must reflect
 // the wall time that passed while the app was not even loaded.
 check('clock kept running while the app was closed', after - before >= AWAY_MS / 1000, true);
 check('clock did not jump absurdly', after - before < AWAY_MS / 1000 + 10, true);
 console.log(`        clock ${before}s before, ${after}s after (away ${AWAY_MS / 1000}s)`);
 
-const played = await fresh.locator('h2:has-text("On the field") + .plist .mins b').allInnerTexts();
+const played = await fresh.locator('.token:not(.vacant) .ttime').allInnerTexts();
 check(
   'playing time matches the clock',
   played.every((t) => Math.abs(secs(t) - after) <= 1),
@@ -117,13 +112,13 @@ check(
 );
 
 // And it must still be substitutable, not just readable.
-await fresh.click('h2:has-text("On the field") + .plist .prow >> nth=0');
-await fresh.click('h2:has-text("Bench") + .plist .prow >> nth=0');
+await fresh.click('.token:not(.vacant) >> nth=0');
+await fresh.click('.benchstrip .bplayer >> nth=0');
 await fresh.click('text=/^Sub 1 ↔ 1$/');
 await fresh.waitForTimeout(400);
 check(
-  'still 5 on the field after a resumed sub',
-  await fresh.locator('h2:has-text("On the field") + .plist .prow').count(),
+  'still 5 on the pitch after a resumed sub',
+  await fresh.locator('.token:not(.vacant)').count(),
   5,
 );
 check('no unapplied events', await fresh.locator('.banner.error').count(), 0);

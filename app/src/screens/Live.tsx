@@ -2,9 +2,12 @@ import type { GameEvent, PlayerSlot } from '@subtime/core';
 import { clockAt, displayClockMs, fairness, formatClock, playerStats } from '@subtime/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { beep, mmss, PlayerRow, Screen, Sheet } from '../components';
+import { beep, heatColor, mmss, PlayerRow, Screen, Sheet } from '../components';
 import { db } from '../db';
+import { codesOf } from '../formations';
 import { useGameLog, useNow, useWakeLock } from '../hooks';
+import type { Occupant } from '../Pitch';
+import { Pitch } from '../Pitch';
 import { navigate } from '../router';
 
 const DEFAULT_CFG = {
@@ -31,10 +34,12 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const now = useNow(running);
   useWakeLock(running || state.status === 'paused');
 
+  const [view, setView] = useState<'field' | 'list'>('field');
   const [pickedOff, setPickedOff] = useState<Set<string>>(new Set());
   const [pickedOn, setPickedOn] = useState<Set<string>>(new Set());
   const [sheet, setSheet] = useState<'goal' | 'log' | null>(null);
   const [movingPlayer, setMovingPlayer] = useState<string | null>(null);
+  const [fillingSlot, setFillingSlot] = useState<string | null>(null);
 
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
@@ -55,8 +60,8 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     [state, now],
   );
 
-  const onField = rows.filter((r) => r.onField);
-  const bench = rows.filter((r) => !r.onField);
+  const onFieldRows = rows.filter((r) => r.onField);
+  const benchRows = rows.filter((r) => !r.onField);
   const clock = clockAt(state, now);
 
   // Shift alarm: nudge when it has been a while since the last change.
@@ -83,21 +88,42 @@ export function LiveScreen({ gameId }: { gameId: string }) {
 
   if (!game || !team) return <Screen title="Loading…">{null}</Screen>;
 
-  const positions = team.positions.length ? team.positions : ['GK'];
+  const formation = game.formation;
+  const positions = codesOf(formation);
+  const deficitOf = new Map(rows.map((r) => [r.playerId, r.deficitMs]));
+
+  /*
+   * The engine stores a position code per player; the pitch needs a slot id.
+   * Codes are unique within a formation, so one lookup bridges the two — which
+   * is exactly why `buildFormation` goes to the trouble of de-duplicating them.
+   */
+  const slotByCode = new Map(formation.slots.map((s) => [s.code, s]));
+  const occupants = new Map<string, Occupant>();
+  for (const [playerId, code] of state.onField) {
+    const slot = slotByCode.get(code);
+    if (!slot) continue;
+    const p = nameOf(playerId);
+    occupants.set(slot.id, {
+      playerId,
+      name: p?.name ?? playerId,
+      number: p?.number ?? '',
+      playedMs: stats.get(playerId)?.playedMs ?? 0,
+      ...(deficitOf.has(playerId) ? { deficitMs: deficitOf.get(playerId) as number } : {}),
+    });
+  }
+  const freeCodes = formation.slots.filter((s) => !occupants.has(s.id)).map((s) => s.code);
 
   const makeSub = async () => {
     const off = [...pickedOff];
     const on = [...pickedOn];
     const freed = off.map((id) => state.onField.get(id) ?? positions[0] ?? 'MF');
-    const taken = new Set(
-      [...state.onField.entries()].filter(([id]) => !off.includes(id)).map(([, pos]) => pos),
-    );
+    const spare = [...freeCodes];
 
     const slots: PlayerSlot[] = on.map((playerId, i) => ({
       playerId,
       // A straight swap inherits the outgoing player's position. Anyone extra
-      // takes the first position nobody is occupying.
-      position: freed[i] ?? positions.find((p) => !taken.has(p)) ?? positions[0] ?? 'MF',
+      // fills a position nobody is occupying.
+      position: freed[i] ?? spare.shift() ?? positions[0] ?? 'MF',
     }));
 
     await record({ type: 'SUB', off, on: slots });
@@ -110,6 +136,21 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     apply(next);
+  };
+
+  /**
+   * Tapping an empty position does one of two things, whichever the current
+   * selection implies: move the single selected player there, or open the bench
+   * to fill it.
+   */
+  const tapVacant = (slotCode: string, slotId: string) => {
+    if (pickedOff.size === 1) {
+      const playerId = [...pickedOff][0] as string;
+      void record({ type: 'POSITION_CHANGE', playerId, to: slotCode });
+      setPickedOff(new Set());
+      return;
+    }
+    setFillingSlot(slotId);
   };
 
   const periodLabel =
@@ -126,8 +167,13 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   return (
     <Screen
       title={`${team.name} vs ${game.opponent || 'TBD'}`}
-      subtitle={periodLabel}
+      subtitle={`${periodLabel} · ${formation.name}`}
       onBack={() => navigate({ name: 'team', teamId: game.teamId })}
+      action={
+        <button className="btn ghost" onClick={() => navigate({ name: 'summary', gameId })}>
+          Stats
+        </button>
+      }
       footer={
         hasSelection ? (
           <div className="subbar">
@@ -157,19 +203,20 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         ) : (
           <div className="actions">
             <button className="btn" onClick={() => setSheet('goal')} disabled={state.period === 0}>
-              ⚽ Goal
+              ⚽ Us
+            </button>
+            <button
+              className="btn"
+              onClick={() => void record({ type: 'OPPONENT_GOAL' })}
+              disabled={state.period === 0}
+            >
+              ⚽ Them
             </button>
             <button className="btn" onClick={() => void undo()} disabled={events.length === 0}>
               ↩ Undo
             </button>
             <button className="btn" onClick={() => setSheet('log')}>
               ☰ Log
-            </button>
-            <button
-              className="btn"
-              onClick={() => navigate({ name: 'summary', gameId })}
-            >
-              📊 Stats
             </button>
           </div>
         )
@@ -182,30 +229,37 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         </div>
       )}
 
-      <div className="card clock">
-        <div className={`time${state.status === 'paused' ? ' paused' : ''}`}>
-          {formatClock(displayClockMs(config, Math.max(state.period, 1), clock))}
-        </div>
-        <div className="meta">
-          {state.status === 'paused'
-            ? 'Clock stopped'
-            : state.status === 'final'
-              ? 'Full time'
-              : state.status === 'break'
-                ? `${periodLabel} finished`
-                : periodLabel}
+      {/*
+        The pitch is the interface during a game, so everything above it is kept
+        as short as it can be — a tall clock card looks impressive and pushes the
+        thing you actually tap below the fold.
+      */}
+      <div className="card livebar">
+        <div className="lb-clock">
+          <span className={`time${state.status === 'paused' ? ' paused' : ''}`}>
+            {formatClock(displayClockMs(config, Math.max(state.period, 1), clock))}
+          </span>
+          <span className="meta">
+            {state.status === 'paused'
+              ? 'stopped'
+              : state.status === 'final'
+                ? 'full time'
+                : state.status === 'break'
+                  ? `${periodLabel} done`
+                  : periodLabel}
+          </span>
         </div>
         <div className="scoreline">
           <span>{state.score.us}</span>
           <span className="vs">–</span>
           <span>{state.score.them}</span>
         </div>
-        {shiftDue && (
-          <div className="banner" style={{ marginTop: 6 }}>
-            Shift due — last change {mmss(clock - lastSubClock)} ago
-          </div>
-        )}
       </div>
+      {shiftDue && (
+        <div className="banner error">
+          Shift due — last change {mmss(clock - lastSubClock)} ago
+        </div>
+      )}
 
       <PeriodControls
         status={state.status}
@@ -218,58 +272,145 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         onSummary={() => navigate({ name: 'summary', gameId })}
       />
 
-      <div className="row">
+      <div className="seg" role="tablist" aria-label="View">
         <button
-          className="btn grow"
-          onClick={() => void record({ type: 'OPPONENT_GOAL' })}
-          disabled={state.period === 0}
+          role="tab"
+          aria-selected={view === 'field'}
+          className={view === 'field' ? 'on' : ''}
+          onClick={() => setView('field')}
         >
-          Opponent scored
+          Field
+        </button>
+        <button
+          role="tab"
+          aria-selected={view === 'list'}
+          className={view === 'list' ? 'on' : ''}
+          onClick={() => setView('list')}
+        >
+          List
         </button>
       </div>
 
-      <h2>On the field · {onField.length}</h2>
-      <div className="plist">
-        {onField.map((row) => {
-          const p = nameOf(row.playerId);
-          return (
-            <PlayerRow
-              key={row.playerId}
-              name={p?.name ?? row.playerId}
-              number={p?.number ?? ''}
-              position={state.onField.get(row.playerId)}
-              playedMs={stats.get(row.playerId)?.playedMs ?? 0}
-              deficitMs={row.deficitMs}
-              picked={pickedOff.has(row.playerId)}
-              onClick={() => toggle(pickedOff, row.playerId, setPickedOff)}
-              onPositionClick={() => setMovingPlayer(row.playerId)}
-            />
-          );
-        })}
-      </div>
+      {view === 'field' ? (
+        <>
+          <Pitch
+            formation={formation}
+            occupants={occupants}
+            selected={pickedOff}
+            onSlotTap={(slot, occupant) =>
+              occupant
+                ? toggle(pickedOff, occupant.playerId, setPickedOff)
+                : tapVacant(slot.code, slot.id)
+            }
+          />
 
-      <h2>Bench · {bench.length}</h2>
-      {bench.length === 0 && <div className="empty">Everyone is on.</div>}
-      <div className="plist">
-        {bench.map((row) => {
-          const p = nameOf(row.playerId);
-          return (
-            <PlayerRow
-              key={row.playerId}
-              name={p?.name ?? row.playerId}
-              number={p?.number ?? ''}
-              playedMs={stats.get(row.playerId)?.playedMs ?? 0}
-              deficitMs={row.deficitMs}
-              picked={pickedOn.has(row.playerId)}
-              onClick={() => toggle(pickedOn, row.playerId, setPickedOn)}
-            />
-          );
-        })}
-      </div>
-      <p className="small muted">
-        Sorted by who is owed the most time. Tap a player on the field, then a
-        player on the bench, to swap them.
-      </p>
+          <h2>Bench · {benchRows.length}</h2>
+          {benchRows.length === 0 ? (
+            <div className="empty">Everyone is on.</div>
+          ) : (
+            <div className="benchstrip">
+              {benchRows.map((row) => {
+                const p = nameOf(row.playerId);
+                return (
+                  <button
+                    key={row.playerId}
+                    className={`bplayer${pickedOn.has(row.playerId) ? ' picked' : ''}`}
+                    onClick={() => toggle(pickedOn, row.playerId, setPickedOn)}
+                  >
+                    <span className="shirt" style={{ borderColor: heatColor(row.deficitMs) }}>
+                      {p?.number || p?.name.slice(0, 2) || '?'}
+                    </span>
+                    <span className="tname">{p?.name ?? row.playerId}</span>
+                    <span className="ttime">{mmss(stats.get(row.playerId)?.playedMs ?? 0)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <p className="small muted">
+            Tap a player on the pitch, then one on the bench, to swap them. Bench
+            is ordered by who is owed the most time; the ring colour says the same
+            thing. Tap an empty position to fill it — or select one player first
+            and tap an empty position to move them there.
+          </p>
+        </>
+      ) : (
+        <>
+          <h2>On the field · {onFieldRows.length}</h2>
+          <div className="plist">
+            {onFieldRows.map((row) => {
+              const p = nameOf(row.playerId);
+              return (
+                <PlayerRow
+                  key={row.playerId}
+                  name={p?.name ?? row.playerId}
+                  number={p?.number ?? ''}
+                  position={state.onField.get(row.playerId)}
+                  playedMs={stats.get(row.playerId)?.playedMs ?? 0}
+                  deficitMs={row.deficitMs}
+                  picked={pickedOff.has(row.playerId)}
+                  onClick={() => toggle(pickedOff, row.playerId, setPickedOff)}
+                  onPositionClick={() => setMovingPlayer(row.playerId)}
+                />
+              );
+            })}
+          </div>
+
+          <h2>Bench · {benchRows.length}</h2>
+          {benchRows.length === 0 && <div className="empty">Everyone is on.</div>}
+          <div className="plist">
+            {benchRows.map((row) => {
+              const p = nameOf(row.playerId);
+              return (
+                <PlayerRow
+                  key={row.playerId}
+                  name={p?.name ?? row.playerId}
+                  number={p?.number ?? ''}
+                  playedMs={stats.get(row.playerId)?.playedMs ?? 0}
+                  deficitMs={row.deficitMs}
+                  picked={pickedOn.has(row.playerId)}
+                  onClick={() => toggle(pickedOn, row.playerId, setPickedOn)}
+                />
+              );
+            })}
+          </div>
+          <p className="small muted">
+            Sorted by who is owed the most time. Tap a player on the field, then a
+            player on the bench, to swap them.
+          </p>
+        </>
+      )}
+
+      {fillingSlot && (
+        <Sheet
+          title={`${formation.slots.find((s) => s.id === fillingSlot)?.code ?? ''} — who goes on?`}
+          onClose={() => setFillingSlot(null)}
+        >
+          <div className="chips">
+            {benchRows.map((row) => {
+              const p = nameOf(row.playerId);
+              const code = formation.slots.find((s) => s.id === fillingSlot)?.code ?? 'MF';
+              return (
+                <button
+                  key={row.playerId}
+                  className="chip"
+                  onClick={() => {
+                    void record({
+                      type: 'SUB',
+                      off: [],
+                      on: [{ playerId: row.playerId, position: code }],
+                    });
+                    setFillingSlot(null);
+                  }}
+                >
+                  {p?.number && <b>{p.number}</b>} {p?.name ?? row.playerId}
+                </button>
+              );
+            })}
+            {benchRows.length === 0 && <p className="muted">Nobody is on the bench.</p>}
+          </div>
+        </Sheet>
+      )}
 
       {sheet === 'goal' && (
         <GoalSheet
@@ -429,8 +570,7 @@ function GoalSheet({
   );
 }
 
-const ordinal = (n: number): string =>
-  ['0th', '1st', '2nd', '3rd', '4th'][n] ?? `${n}th`;
+const ordinal = (n: number): string => ['0th', '1st', '2nd', '3rd', '4th'][n] ?? `${n}th`;
 
 /** Human-readable line for the event log. Narrows on the discriminated union. */
 function describe(e: GameEvent, nameOf: (id: string) => { name: string } | undefined): string {

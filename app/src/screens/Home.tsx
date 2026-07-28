@@ -9,10 +9,11 @@ export function HomeScreen() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
+  const [fieldPlayers, setFieldPlayers] = useState(9);
 
   const submit = async () => {
     if (!name.trim()) return;
-    const id = await createTeam(name.trim(), ageGroup.trim());
+    const id = await createTeam(name.trim(), ageGroup.trim(), fieldPlayers);
     setAdding(false);
     setName('');
     setAgeGroup('');
@@ -71,6 +72,23 @@ export function HomeScreen() {
                 onKeyDown={(e) => e.key === 'Enter' && void submit()}
               />
             </label>
+            <label className="field">
+              <span>Format</span>
+              <select
+                value={fieldPlayers}
+                onChange={(e) => setFieldPlayers(Number(e.target.value))}
+              >
+                {[4, 5, 6, 7, 8, 9, 10, 11].map((n) => (
+                  <option key={n} value={n}>
+                    {n} v {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="small muted" style={{ marginTop: -6 }}>
+              Sets the starting formation. You can change the shape and drag
+              positions afterwards.
+            </p>
             <button className="btn primary block" disabled={!name.trim()} onClick={() => void submit()}>
               Create team
             </button>

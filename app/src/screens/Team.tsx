@@ -202,7 +202,7 @@ function NewGameSheet({ team, onClose }: { team: Team; onClose: () => void }) {
         <p className="small muted">
           Uses this team's format: {team.config.periods.count} ×{' '}
           {Math.round(team.config.periods.lengthMs / 60_000)} min,{' '}
-          {team.config.periods.fieldPlayers} a side.
+          {team.formation.slots.length} a side in {team.formation.name}.
         </p>
         <button className="btn primary block" onClick={() => void submit()}>
           Create game
@@ -220,16 +220,13 @@ function NewGameSheet({ team, onClose }: { team: Team; onClose: () => void }) {
 function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
   const [periods, setPeriods] = useState(team.config.periods.count);
   const [lengthMin, setLengthMin] = useState(Math.round(team.config.periods.lengthMs / 60_000));
-  const [fieldPlayers, setFieldPlayers] = useState(team.config.periods.fieldPlayers);
   const [gkWeight, setGkWeight] = useState(team.config.fairness.gkWeight);
-  const [positions, setPositions] = useState(team.positions.join(' '));
 
   const save = async () => {
     await db.teams.update(team.id, {
-      positions: positions.split(/[\s,]+/).map((p) => p.trim().toUpperCase()).filter(Boolean),
       config: {
         ...team.config,
-        periods: { count: periods, lengthMs: lengthMin * 60_000, fieldPlayers },
+        periods: { ...team.config.periods, count: periods, lengthMs: lengthMin * 60_000 },
         fairness: { ...team.config.fairness, gkWeight },
       },
     });
@@ -262,18 +259,6 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
         </div>
 
         <label className="field">
-          <span>Players on the field (per side, including keeper)</span>
-          <input
-            type="number"
-            min={1}
-            max={11}
-            value={fieldPlayers}
-            onChange={(e) => setFieldPlayers(Math.max(1, Number(e.target.value)))}
-            inputMode="numeric"
-          />
-        </label>
-
-        <label className="field">
           <span>Keeper minutes count toward fair share</span>
           <select value={gkWeight} onChange={(e) => setGkWeight(Number(e.target.value))}>
             <option value={1}>Fully — a minute is a minute</option>
@@ -286,12 +271,18 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
           are always the real ones.
         </p>
 
-        <label className="field">
-          <span>Positions</span>
-          <input value={positions} onChange={(e) => setPositions(e.target.value)} />
-        </label>
+        <button
+          className="btn block"
+          onClick={() => {
+            onClose();
+            navigate({ name: 'formation', teamId: team.id });
+          }}
+        >
+          Formation: {team.formation.name} · {team.formation.slots.length} a side ›
+        </button>
         <p className="small muted" style={{ marginTop: -6 }}>
-          Space-separated, in formation order. The first is treated as the keeper.
+          Squad size and positions live on the formation, where you can drag them
+          into the shape you actually play.
         </p>
 
         <button className="btn primary block" onClick={() => void save()}>

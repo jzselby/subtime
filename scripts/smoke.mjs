@@ -59,6 +59,7 @@ await page.waitForSelector('text=Sub Time');
 await page.click('text=+ New team');
 await page.fill('input[placeholder="Thunder"]', 'Riverside U11');
 await page.fill('input[placeholder="U11"]', 'U11');
+await page.selectOption('.sheet select', '7');   // 7 a side
 await page.click('text=Create team');
 await page.waitForSelector('text=Roster · 0');
 await shot(page, 'team-empty');
@@ -76,15 +77,42 @@ await page.waitForSelector(`text=Roster · ${ROSTER.length}`);
 check('roster size', await page.locator('.plist .num-badge').count() >= ROSTER.length, true);
 await shot(page, 'roster');
 
-// -- settings: 2 x 10 min, 7 a side ---------------------------------------
+// -- settings: 2 x 10 min, keeper minutes at half credit -------------------
 await page.click('text=Settings');
-await page.selectOption('select >> nth=0', '2');
-await page.fill('input[type="number"] >> nth=0', '10');
-await page.fill('input[type="number"] >> nth=1', '7');
-await page.selectOption('select >> nth=1', '0.5'); // keeper minutes at half credit
-await page.fill('input[value*="GK"]', 'GK LB CB RB LM CM ST');
+await page.selectOption('.sheet select >> nth=0', '2');
+await page.fill('.sheet input[type="number"]', '10');
+await page.selectOption('.sheet select >> nth=1', '0.5');
 await page.click('.sheet >> text=Save');
 await page.waitForTimeout(200);
+
+// -- formation: switch shape and drag a position --------------------------
+await page.click('text=Settings');
+await page.click('text=/^Formation: /');
+await page.waitForSelector('text=Shape');
+check('pitch is drawn', await page.locator('.pitch-lines').count(), 1);
+check('a slot per player', await page.locator('.token').count(), 7);
+await shot(page, 'formation');
+
+await page.click('.chips >> text=3-2-1');
+await page.waitForTimeout(150);
+check('preset changed the shape', await page.locator('.token').count(), 7);
+
+// Drag the striker to the left. The pitch is normalised 0..1, so verify the
+// slot's own left offset moved rather than trusting the gesture fired.
+const striker = page.locator('.token', { hasText: 'ST' }).first();
+const beforeBox = await striker.boundingBox();
+const pitchBox = await page.locator('.pitch').boundingBox();
+await striker.hover();
+await page.mouse.down();
+await page.mouse.move(pitchBox.x + pitchBox.width * 0.25, pitchBox.y + pitchBox.height * 0.3, { steps: 8 });
+await page.mouse.up();
+await page.waitForTimeout(150);
+const afterBox = await striker.boundingBox();
+check('dragging a position moves it', afterBox.x < beforeBox.x - 20, true);
+await shot(page, 'formation-dragged');
+
+await page.click('text=Save formation');
+await page.waitForSelector('text=Roster · 11');
 
 // -- game ------------------------------------------------------------------
 await page.click('text=+ New game');
@@ -96,16 +124,22 @@ await shot(page, 'setup-empty');
 // One player is away; the other ten are available for seven shirts.
 await page.click('.chips >> text=Kit');
 
-for (let slot = 0; slot < 7; slot++) {
-  await page.click(`.plist .prow >> nth=${slot}`);
-  await page.click(`.sheet .chip >> nth=${slot}`);
-  await page.waitForTimeout(40);
+// Assign two by tapping the pitch, then let "Fill rest" do the remainder.
+for (let slot = 0; slot < 2; slot++) {
+  await page.click(`.token >> nth=${slot}`);
+  // Already-assigned players are disabled in the picker, so take the first
+  // one that is still selectable.
+  await page.click('.sheet .chip:not([disabled]) >> nth=0');
+  await page.waitForTimeout(60);
 }
+await page.click('text=Fill rest');
+await page.waitForTimeout(150);
 await shot(page, 'setup-filled');
+check('lineup is on the pitch', await page.locator('.token:not(.vacant)').count(), 7);
 check('start enabled', await page.locator('text=Start game').isEnabled(), true);
 
 await page.click('text=Start game');
-await page.waitForSelector('text=On the field');
+await page.waitForSelector('.pitch');
 await shot(page, 'live-pregame');
 
 // -- kick off --------------------------------------------------------------
@@ -114,46 +148,59 @@ await page.waitForSelector('text=Stop clock');
 await page.waitForTimeout(2500);
 await shot(page, 'live-running');
 
-const clockText = await page.locator('.clock .time').innerText();
+const clockText = await page.locator('.livebar .time').innerText();
 check('clock is advancing', /0:0[1-9]/.test(clockText), true);
 
 // -- a substitution --------------------------------------------------------
 // Bench is sorted most-owed-first, so the top bench row is the app's own
 // suggestion. Take the top on-field row off for them.
-const benchName = await page.locator('h2:has-text("Bench") + .plist .name >> nth=0').innerText();
-await page.click('h2:has-text("On the field") + .plist .prow >> nth=0');
-await page.click('h2:has-text("Bench") + .plist .prow >> nth=0');
+check('field view is the default', await page.locator('.pitch').count(), 1);
+const benchName = await page.locator('.benchstrip .bplayer .tname >> nth=0').innerText();
+await page.click('.token:not(.vacant) >> nth=0');
+await page.click('.benchstrip .bplayer >> nth=0');
 await shot(page, 'live-sub-pending');
 await page.click('text=/^Sub 1 ↔ 1$/');
 await page.waitForTimeout(400);
 
-const onFieldNames = await page.locator('h2:has-text("On the field") + .plist .name').allInnerTexts();
-check('subbed player came on', onFieldNames.includes(benchName), true);
-check('still 7 on the field', onFieldNames.length, 7);
+const onPitch = await page.locator('.token:not(.vacant) .tname').allInnerTexts();
+check('subbed player came on', onPitch.includes(benchName), true);
+check('still 7 on the pitch', onPitch.length, 7);
 await shot(page, 'live-after-sub');
 
+// The list view must stay in step with the pitch.
+await page.click('.seg >> text=List');
+await page.waitForTimeout(150);
+check(
+  'list view agrees with the pitch',
+  await page.locator('h2:has-text("On the field") + .plist .prow').count(),
+  7,
+);
+await shot(page, 'live-list');
+await page.click('.seg >> text=Field');
+await page.waitForTimeout(150);
+
 // -- goals -----------------------------------------------------------------
-await page.click('text=⚽ Goal');
+await page.click('text=⚽ Us');
 await page.click('.sheet .chip >> nth=0');
 await page.click('.sheet .chip >> nth=0');
 await page.waitForTimeout(300);
-await page.click('text=Opponent scored');
+await page.click('text=⚽ Them');
 await page.waitForTimeout(300);
 check('score reads 1–1', (await page.locator('.scoreline').innerText()).replace(/\s+/g, ''), '1–1');
 
 // -- stoppage: the clock must freeze --------------------------------------
 await page.click('text=Stop clock');
 await page.waitForTimeout(200);
-const frozen = await page.locator('.clock .time').innerText();
+const frozen = await page.locator('.livebar .time').innerText();
 await page.waitForTimeout(1800);
-check('clock frozen while stopped', await page.locator('.clock .time').innerText(), frozen);
+check('clock frozen while stopped', await page.locator('.livebar .time').innerText(), frozen);
 await shot(page, 'live-paused');
 
 await page.click('text=Restart clock');
 await page.waitForTimeout(1200);
 check(
   'clock resumes from the pause point',
-  (await page.locator('.clock .time').innerText()) !== frozen,
+  (await page.locator('.livebar .time').innerText()) !== frozen,
   true,
 );
 
@@ -176,8 +223,8 @@ await page.click('text=Start 2nd half');
 await page.waitForTimeout(1500);
 
 // A second sub in the second half, so the timeline has something to show.
-await page.click('h2:has-text("On the field") + .plist .prow >> nth=0');
-await page.click('h2:has-text("Bench") + .plist .prow >> nth=0');
+await page.click('.token:not(.vacant) >> nth=0');
+await page.click('.benchstrip .bplayer >> nth=0');
 await page.click('text=/^Sub 1 ↔ 1$/');
 await page.waitForTimeout(1200);
 

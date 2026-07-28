@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { requestPersistence } from './db';
 import { useRoute } from './router';
+import { FormationScreen } from './screens/Formation';
 import { HomeScreen } from './screens/Home';
 import { LiveScreen } from './screens/Live';
 import { SetupScreen } from './screens/Setup';
@@ -19,6 +20,8 @@ export function App() {
   switch (route.name) {
     case 'team':
       return <TeamScreen key={route.teamId} teamId={route.teamId} />;
+    case 'formation':
+      return <FormationScreen key={route.teamId} teamId={route.teamId} />;
     case 'setup':
       return <SetupScreen key={route.gameId} gameId={route.gameId} />;
     case 'live':

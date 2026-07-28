@@ -1,6 +1,8 @@
 import type { GameConfig, GameEvent } from '@subtime/core';
 import { defaultConfig } from '@subtime/core';
 import Dexie, { type EntityTable } from 'dexie';
+import type { Formation } from './formations';
+import { defaultFormation } from './formations';
 
 /**
  * Local-first storage. Everything a game needs lives here, so a match can be run
@@ -13,8 +15,12 @@ export interface Team {
   id: string;
   name: string;
   ageGroup: string;
-  /** Position codes offered in the lineup picker, in formation order. */
-  positions: string[];
+  /**
+   * Position slots and where they stand. The source of truth for both the field
+   * view and the position vocabulary — `codesOf(formation)` replaces what used
+   * to be a separate string list.
+   */
+  formation: Formation;
   config: GameConfig;
   createdAt: number;
 }
@@ -33,6 +39,8 @@ export interface Game {
   opponent: string;
   kickoffAt: number;
   config: GameConfig;
+  /** Snapshotted at creation, so changing the team's shape never rewrites history. */
+  formation: Formation;
   status: 'setup' | 'live' | 'final';
   createdAt: number;
 }
@@ -52,6 +60,33 @@ export class SubTimeDb extends Dexie {
       // Compound index so a game's log loads in sequence order in one query.
       events: 'id, gameId, [gameId+seq]',
     });
+
+    // v2 replaced the flat `positions: string[]` with a positioned formation.
+    // Existing rows get the standard formation for their squad size; their old
+    // codes are not recoverable as coordinates, and a preset is a better
+    // starting point than slots piled at the origin.
+    this.version(2)
+      .stores({})
+      .upgrade(async (tx) => {
+        const teams = tx.table<Record<string, unknown>>('teams');
+        for (const team of await teams.toArray()) {
+          if (team.formation) continue;
+          const cfg = team.config as GameConfig | undefined;
+          const size = cfg?.periods.fieldPlayers ?? 9;
+          await teams.update(team.id as string, {
+            formation: defaultFormation(size),
+            positions: undefined,
+          });
+        }
+        const games = tx.table<Record<string, unknown>>('games');
+        for (const game of await games.toArray()) {
+          if (game.formation) continue;
+          const cfg = game.config as GameConfig | undefined;
+          await games.update(game.id as string, {
+            formation: defaultFormation(cfg?.periods.fieldPlayers ?? 9),
+          });
+        }
+      });
   }
 }
 
@@ -60,17 +95,20 @@ export const db = new SubTimeDb();
 export const uid = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-/** 9v9 is the most common youth format, so it is the default for a new team. */
-export const DEFAULT_POSITIONS = ['GK', 'LB', 'CB', 'RB', 'LM', 'CM', 'RM', 'LW', 'ST'];
-
-export async function createTeam(name: string, ageGroup: string): Promise<string> {
+export async function createTeam(
+  name: string,
+  ageGroup: string,
+  fieldPlayers = 9,
+): Promise<string> {
   const id = uid();
+  const config = defaultConfig();
+  config.periods.fieldPlayers = fieldPlayers;
   await db.teams.add({
     id,
     name,
     ageGroup,
-    positions: DEFAULT_POSITIONS,
-    config: defaultConfig(),
+    formation: defaultFormation(fieldPlayers),
+    config,
     createdAt: Date.now(),
   });
   return id;
@@ -83,9 +121,10 @@ export async function createGame(team: Team, opponent: string, kickoffAt: number
     teamId: team.id,
     opponent,
     kickoffAt,
-    // Snapshot the team's config: changing team defaults later must not rewrite
+    // Snapshot config and shape: changing team defaults later must not rewrite
     // the rules of a game that has already been played.
     config: structuredClone(team.config),
+    formation: structuredClone(team.formation),
     status: 'setup',
     createdAt: Date.now(),
   });

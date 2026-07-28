@@ -242,8 +242,9 @@ rain, watching the game — not the screen.
 - **Always visible:** game clock, score, and a "next up" queue sorted by deficit.
 - **Heat-coded roster.** Colour each player by minutes deficit for an instant read.
 - **Prominent undo,** plus a full event-log editor for post-game cleanup.
-- **Two views:** a list view (fastest for subs) and a pitch view (for positions).
-  List is the default; coaches sub far more often than they reposition.
+- **Two views:** a pitch view (spatial, matches how you think about the shape)
+  and a list view (fastest to scan minutes). Built both — the pitch is the
+  default, because on a sideline you are looking at a shape, not a table.
 - **Sub interval alarm:** optional buzz every N minutes at a natural stoppage.
 - **Goal entry in one flow:** tap GOAL → pick scorer from the on-field six → pick
   assist or skip. Never make the coach scroll the full roster mid-celebration.
@@ -287,7 +288,7 @@ one starts.
 | Phase | Scope | Done when |
 | --- | --- | --- |
 | **0** ✅ | `core/`: event types, reducer, stint fold, property tests | Invariant holds under random logs — [built](./core/) |
-| **1** | Single game: timer, roster, subs, live playing time. Local only. | **You run one real game on it** |
+| **1** ✅ | Single game: timer, roster, formations, field view, subs, live playing time | **You run one real game on it** |
 | **2** | Goals/assists/events, teams & seasons, Supabase sync | A season's data persists |
 | **3** | Fairness deficits, then the shift planner | Suggestions are good enough to accept |
 | **4** | Reporting + share links + exports | Head coach opens a link and gets it |
