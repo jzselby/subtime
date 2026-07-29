@@ -304,6 +304,13 @@ h2 {
   min-width: 0;
 }
 
+/* Sizing to content alone left G/A sitting right up against the name with
+   barely a gap — this is the breathing room between them. */
+.tbl-compact th:not(:first-child),
+.tbl-compact td:not(:first-child) {
+  padding-left: 28px;
+}
+
 .tbl tbody tr:hover td {
   background: var(--page);
 }
