@@ -302,6 +302,14 @@ export interface FairnessRow {
   targetMs: number;
   /** `target - projected`. Positive means owed time; sub them on. */
   deficitMs: number;
+  /**
+   * Currently in goal under `gkWeight: 0` — not part of the equal-rotation
+   * pool at all right now, rather than merely weighted low within it.
+   * `targetMs`/`deficitMs` are both zero for exactly this reason; the UI
+   * uses this to skip the "on track" / "ends N short" tag entirely rather
+   * than show one that would otherwise read as a false all-clear.
+   */
+  excludedGk: boolean;
 }
 
 export function availablePlayers(state: GameState): PlayerId[] {
@@ -318,6 +326,20 @@ export function availablePlayers(state: GameState): PlayerId[] {
  * `weights` implements the fairness *mode*: omit it for strict equal time, or
  * pass per-player weights (practice attendance, say) for a weighted target.
  * A player's target is `totalFieldTime × wᵢ / Σw`.
+ *
+ * `gkWeight: 0` ("Not at all", in Team settings) means the keeper is
+ * *excluded*, not just weighted to zero within the same pool — whoever is
+ * currently in goal carries no target and no deficit, and their slot's
+ * minutes are not divided up among everyone else's targets either. Discounting
+ * only their *credit* while still expecting them to hit the same target as
+ * anyone else — which is what a naive zero-weight would do — made a keeper who
+ * had played the entire game look exactly as "owed" as someone who had not
+ * played at all, the opposite of what "excluded" is supposed to mean. This
+ * is per-instant, not per-game: a rotating keeper picks the target back up
+ * the moment they're subbed to an outfield position or the bench, and
+ * because gkWeight discounted their time in goal, they still start that
+ * next spell genuinely behind — which is the point of the setting for a
+ * team that rotates keepers rather than dedicating one.
  */
 export function fairness(
   state: GameState,
@@ -325,14 +347,21 @@ export function fairness(
   weights?: ReadonlyMap<PlayerId, number>,
 ): FairnessRow[] {
   const { count, lengthMs, fieldPlayers } = state.config.periods;
-  const totalFieldMs = count * lengthMs * fieldPlayers;
   const remaining = remainingInGameMs(state, nowWallTs);
 
   const roster = availablePlayers(state);
   const pool = roster.length > 0 ? roster : [...new Set(state.stints.map((s) => s.playerId))].sort();
 
+  const gkExcluded = state.config.fairness.gkWeight === 0;
+  const isExcludedGk = (playerId: PlayerId): boolean =>
+    gkExcluded && state.onField.get(playerId) === state.config.gkPosition;
+
+  const sharedPool = pool.filter((playerId) => !isExcludedGk(playerId));
+  const excludedSlots = pool.length - sharedPool.length;
+  const totalFieldMs = count * lengthMs * Math.max(0, fieldPlayers - excludedSlots);
+
   const weightOf = (playerId: PlayerId): number => weights?.get(playerId) ?? 1;
-  const weightSum = pool.reduce((acc, playerId) => acc + weightOf(playerId), 0);
+  const weightSum = sharedPool.reduce((acc, playerId) => acc + weightOf(playerId), 0);
 
   const stats = new Map(playerStats(state, nowWallTs).map((s) => [s.playerId, s]));
 
@@ -342,7 +371,12 @@ export function fairness(
     const weightedPlayedMs = s?.weightedPlayedMs ?? 0;
     const onField = state.onField.has(playerId);
     const projectedMs = weightedPlayedMs + (onField ? remaining : 0);
-    const targetMs = weightSum > 0 ? (totalFieldMs * weightOf(playerId)) / weightSum : 0;
+    const excludedGk = isExcludedGk(playerId);
+    const targetMs = excludedGk
+      ? 0
+      : weightSum > 0
+        ? (totalFieldMs * weightOf(playerId)) / weightSum
+        : 0;
     return {
       playerId,
       onField,
@@ -350,7 +384,8 @@ export function fairness(
       weightedPlayedMs,
       projectedMs,
       targetMs,
-      deficitMs: targetMs - projectedMs,
+      deficitMs: excludedGk ? 0 : targetMs - projectedMs,
+      excludedGk,
     };
   });
 
@@ -385,11 +420,23 @@ export function suggestSubsOff(state: GameState, nowWallTs: number, howMany: num
  * This is `min / max` of playing time across available players: blunt, but it
  * cannot be gamed by an outlier the way a mean-based measure can, and coaches
  * read it without explanation.
+ *
+ * With `gkWeight: 0`, whoever is in goal (as of the state passed in — for a
+ * finished game that's however the lineup stood at the final whistle) is left
+ * out of the ratio for the same reason `fairness()` excludes them: a
+ * dedicated keeper's very different minutes profile is not a rotation
+ * fairness question, and folding it into a raw min/max would either make the
+ * team look unfair for a decision that was never about equal rotation, or —
+ * if the keeper never subs and so has the *most* minutes of anyone — inflate
+ * the score by making them the max everyone else is compared against.
  */
 export function fairnessIndex(state: GameState, nowWallTs: number): number {
   const pool = availablePlayers(state);
+  const gkExcluded = state.config.fairness.gkWeight === 0;
   const stats = playerStats(state, nowWallTs).filter(
-    (s) => pool.length === 0 || pool.includes(s.playerId),
+    (s) =>
+      (pool.length === 0 || pool.includes(s.playerId)) &&
+      !(gkExcluded && state.onField.get(s.playerId) === state.config.gkPosition),
   );
   if (stats.length === 0) return 1;
   const times = stats.map((s) => s.playedMs);

@@ -8,7 +8,7 @@ See [`../DESIGN.md`](../DESIGN.md) for why it is built this way.
 
 ```bash
 npm install
-npm test          # 48 tests, including ~3,000 generated games
+npm test          # 51 tests, including ~3,000 generated games
 npm run typecheck
 npm run build
 ```
@@ -78,6 +78,15 @@ half-open on `[startMs, endMs)` so a sub at minute 20 is never counted twice.
 Everything else reads off it: minutes played, bench time, minutes by position
 (development), goal differential while on the field (plus/minus), and the live
 fairness table.
+
+`fairness.gkWeight` is `1` / `0.5` / `0` — how much a minute in goal counts
+toward a player's own target. `0` means the keeper is *excluded*, not merely
+weighted to zero: whoever's in goal right now carries no target and no
+deficit, and the outfield target is worked out over the outfield spots only,
+not diluted by a slot that was never actually shared. This is per-instant, not
+per-game — a rotating keeper rejoins the pool the moment they sub to an
+outfield spot, and because their time in goal earned no credit, they pick up
+a genuine target for whatever they play next.
 
 ## Errors are data, not exceptions
 

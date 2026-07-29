@@ -493,7 +493,11 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                   number={p?.number ?? ''}
                   position={state.onField.get(row.playerId)}
                   playedMs={stats.get(row.playerId)?.playedMs ?? 0}
-                  deficitMs={row.deficitMs}
+                  // A keeper excluded from fairness (gkWeight 0, Team
+                  // settings) has no target at all right now, not a met
+                  // one — "on track" would read as a false all-clear, so
+                  // the tag is left off entirely rather than shown wrong.
+                  deficitMs={row.excludedGk ? undefined : row.deficitMs}
                   picked={pickedOff.has(row.playerId)}
                   onClick={() => toggle(pickedOff, row.playerId, setPickedOff)}
                   onPositionClick={() => setMovingPlayer(row.playerId)}

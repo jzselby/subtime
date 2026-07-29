@@ -230,6 +230,23 @@ computed fresh each time the screen opens. Games still in **setup** don't
 count — they haven't been played — but a **live** game counts as it happens,
 so the season total updates mid-match, not just once a game is finalised.
 
+### Keeper and fairness
+
+Team settings → **Keeper minutes count toward fair share** has three settings.
+**Fully** treats a minute in goal like a minute anywhere else. **Half credit**
+discounts it, so a keeper still earns some credit toward the same target as
+everyone else. **Not at all** *excludes* the keeper: whoever's in goal right
+now carries no target and no "owed time" tag at all, and everyone else's
+target is worked out over the outfield spots only rather than diluted by one
+that was never actually shared. That's the setting for a dedicated keeper who
+isn't expected to rotate through outfield.
+
+The exclusion tracks the goal position, not a specific player, so a team that
+rotates keepers is covered by the same setting: the moment someone subs out of
+goal, they rejoin the fairness pool — and because their minutes in goal earned
+no credit, they pick up a real target for whatever they play next, on top of
+their keeper spell rather than instead of it.
+
 ## What doesn't yet
 
 Server sync and multi-device (Phase 2) · the shift **planner** that pre-generates
@@ -264,6 +281,7 @@ node scripts/checkfit.mjs                 # layout fits every phone, no overlaps
 node scripts/season.mjs                   # season totals actually sum across games
 node scripts/keyboard.mjs                 # a sheet's input stays above the keyboard
 node scripts/orientation.mjs              # portrait only, the guard covers everything
+node scripts/gk-fairness.mjs              # "Not at all" really excludes the keeper
 ```
 
 `scripts/smoke.mjs` plays a full two-half game through the actual UI — roster,
@@ -417,6 +435,18 @@ CSS-hidden, specifically so it can never collide with another script's
 `text=` selector the way an always-present-but-hidden copy of it did twice
 during development (Playwright's `text=` matches case-insensitive substrings
 against *any* matching element, visible or not).
+
+`scripts/gk-fairness.mjs` covers the visible end of the keeper-exclusion fix:
+with "Not at all" set, it plays a game, switches to list view, and checks the
+keeper's row carries no "on track" / "ends N short" tag at all while an
+outfield player's still does. The underlying maths — that the excluded
+keeper's target and deficit are genuinely zero rather than merely
+discounted, that the outfield target is worked out over the outfield spots
+only, that a rotating keeper picks their target back up the moment they
+leave goal, and that the whole-game fairness ratio isn't distorted by
+folding the keeper's very different minutes into it — is unit-tested in
+`core/test/fairness.test.ts`, each case verified with teeth by reverting the
+relevant exclusion and confirming the test that covers it fails.
 
 The engine's own guarantee is documented in [`core/README.md`](./core/README.md):
 `Σ player minutes == ∫ onFieldCount dt`, verified two independent ways over

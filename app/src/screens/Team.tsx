@@ -426,12 +426,16 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
           <select value={gkWeight} onChange={(e) => setGkWeight(Number(e.target.value))}>
             <option value={1}>Fully — a minute is a minute</option>
             <option value={0.5}>Half credit</option>
-            <option value={0}>Not at all</option>
+            <option value={0}>Not at all — the keeper is excluded</option>
           </select>
         </label>
         <p className="small muted" style={{ marginTop: -6 }}>
           Only affects the fairness targets and sub suggestions. Reported minutes
-          are always the real ones.
+          are always the real ones. "Not at all" is for a dedicated keeper who
+          isn't part of the rotation: whoever's in goal carries no target and no
+          "owed time" tag of their own, and everyone else's target is worked out
+          over the outfield spots only, not diluted by one that was never
+          actually shared.
         </p>
 
         <button
