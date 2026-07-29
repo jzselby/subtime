@@ -101,7 +101,7 @@ check('the subtitle counts both started games', await page.locator('text=2 games
 const rows = await page.evaluate(() =>
   [...document.querySelectorAll('.tbl tbody tr')].map((tr) => {
     const cells = [...tr.querySelectorAll('td')].map((td) => td.textContent?.trim() ?? '');
-    return { name: cells[0], gp: cells[1], min: cells[2], positions: cells[3], goals: cells[4] };
+    return { name: cells[0], gp: cells[1], min: cells[2], goals: cells[3], positions: cells[5] };
   }),
 );
 console.log('season rows:', rows);

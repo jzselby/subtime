@@ -76,9 +76,9 @@ export function SeasonView({
                 <th>Player</th>
                 <th style={{ width: '1%' }}>GP</th>
                 <th style={{ width: '1%' }}>Min</th>
-                <th style={{ textAlign: 'left' }}>Positions</th>
                 <th style={{ width: '1%' }}>G</th>
                 <th style={{ width: '1%' }}>A</th>
+                <th style={{ textAlign: 'left' }}>Positions</th>
               </tr>
             </thead>
             <tbody>
@@ -92,9 +92,9 @@ export function SeasonView({
                   </td>
                   <td>{r.games}</td>
                   <td>{mins(r.playedMs)}</td>
-                  <td style={{ textAlign: 'left' }}>{byPositionMinutes(r.msByPosition) || '—'}</td>
                   <td>{r.goals || ''}</td>
                   <td>{r.assists || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{byPositionMinutes(r.msByPosition) || '—'}</td>
                 </tr>
               ))}
             </tbody>

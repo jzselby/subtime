@@ -5,10 +5,11 @@ import { mins, Screen } from '../components';
 import { db } from '../db';
 import { navigate } from '../router';
 
-/** "CM 42m · LB 8m", longest total spell first. */
+/** "CM 42m · LB 8m", longest total spell first, top 3. */
 const byPosition = (msByPosition: Record<string, number>): string =>
   Object.entries(msByPosition)
     .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
     .map(([code, ms]) => `${code} ${mins(ms)}m`)
     .join(' · ');
 
@@ -68,9 +69,9 @@ export function SeasonScreen({ teamId }: { teamId: string }) {
                 <th>Player</th>
                 <th>GP</th>
                 <th>Min</th>
-                <th>Positions</th>
                 <th>G</th>
                 <th>A</th>
+                <th>Positions</th>
               </tr>
             </thead>
             <tbody>
@@ -84,9 +85,9 @@ export function SeasonScreen({ teamId }: { teamId: string }) {
                   </td>
                   <td>{r.games}</td>
                   <td>{mins(r.playedMs)}</td>
-                  <td style={{ textAlign: 'left' }}>{byPosition(r.msByPosition) || '—'}</td>
                   <td>{r.goals || ''}</td>
                   <td>{r.assists || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{byPosition(r.msByPosition) || '—'}</td>
                 </tr>
               ))}
             </tbody>

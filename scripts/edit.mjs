@@ -34,7 +34,7 @@ page.on('pageerror', (e) => {
 const statsRow = async (name) => {
   const row = page.locator(`table.tbl >> nth=1 >> tbody tr:has-text("${name}")`);
   const cells = await row.locator('td').allInnerTexts();
-  return { goals: cells[4]?.trim() ?? '', assists: cells[5]?.trim() ?? '' };
+  return { goals: cells[2]?.trim() ?? '', assists: cells[3]?.trim() ?? '' };
 };
 
 await page.goto(URL);

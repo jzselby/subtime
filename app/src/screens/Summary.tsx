@@ -79,10 +79,11 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
     [state, now],
   );
 
-  /** "CM 12:30 · LB 8:00", longest spell first. */
+  /** "CM 12:30 · LB 8:00", longest spell first, top 3 — the rest is noise for a wall of positions. */
   const byPosition = (msByPosition: Record<string, number>): string =>
     Object.entries(msByPosition)
       .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
       .map(([code, ms]) => `${code} ${mmss(ms)}`)
       .join(' · ');
 
@@ -532,10 +533,10 @@ ${rows}
             <tr>
               <th>Player</th>
               <th>Min</th>
-              <th>Bench</th>
-              <th>Positions</th>
               <th>G</th>
               <th>A</th>
+              <th>Bench</th>
+              <th>Positions</th>
             </tr>
           </thead>
           <tbody>
@@ -543,10 +544,10 @@ ${rows}
               <tr key={s.playerId}>
                 <td>{nameOf(s.playerId)}</td>
                 <td>{mins(s.playedMs)}</td>
-                <td className="muted">{mins(s.benchMs)}</td>
-                <td style={{ textAlign: 'left' }}>{byPosition(s.msByPosition) || '—'}</td>
                 <td>{s.goals || ''}</td>
                 <td>{s.assists || ''}</td>
+                <td className="muted">{mins(s.benchMs)}</td>
+                <td style={{ textAlign: 'left' }}>{byPosition(s.msByPosition) || '—'}</td>
               </tr>
             ))}
           </tbody>
