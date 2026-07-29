@@ -48,23 +48,6 @@ export function GameView({
         {!result && game.status === 'live' && <span className="result-chip live">In progress</span>}
       </p>
 
-      <div
-        className={`card meter ${fairness >= 0.8 ? 'good' : fairness >= 0.5 ? 'warning' : 'critical'}`}
-        style={{ marginTop: 16 }}
-      >
-        <div className="meter-top">
-          <span className="meter-label">Playing-time fairness</span>
-          <span className="meter-value">{Math.round(fairness * 100)}%</span>
-        </div>
-        <span className="meter-track">
-          <span className="meter-fill" style={{ width: `${Math.round(fairness * 100)}%` }} />
-        </span>
-        <span className="meter-caption">
-          The least-played available player got {Math.round(fairness * 100)}% of the
-          most-played player's minutes.
-        </span>
-      </div>
-
       {scorers.length > 0 && (
         <>
           <h2>Goals and assists</h2>
@@ -118,6 +101,23 @@ export function GameView({
           </table>
         </div>
       )}
+
+      <div
+        className={`card meter ${fairness >= 0.8 ? 'good' : fairness >= 0.5 ? 'warning' : 'critical'}`}
+        style={{ marginTop: 16 }}
+      >
+        <div className="meter-top">
+          <span className="meter-label">Playing-time fairness</span>
+          <span className="meter-value">{Math.round(fairness * 100)}%</span>
+        </div>
+        <span className="meter-track">
+          <span className="meter-fill" style={{ width: `${Math.round(fairness * 100)}%` }} />
+        </span>
+        <span className="meter-caption">
+          The least-played available player got {Math.round(fairness * 100)}% of the
+          most-played player's minutes.
+        </span>
+      </div>
 
       {state.stints.length > 0 && (
         <>
