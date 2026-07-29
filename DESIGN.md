@@ -290,9 +290,18 @@ one starts.
 | --- | --- | --- |
 | **0** ✅ | `core/`: event types, reducer, stint fold, property tests | Invariant holds under random logs — [built](./core/) |
 | **1** ✅ | Single game: timer, roster, formations, field view, subs, live playing time | **You run one real game on it** |
-| **2** | Goals/assists/events, teams & seasons, Supabase sync | A season's data persists |
-| **3** | Fairness deficits, then the shift planner | Suggestions are good enough to accept |
-| **4** | Reporting + share links + exports | Head coach opens a link and gets it |
+| **2** | Goals/assists/events, teams & seasons ✅ · Supabase sync 🔧 | A season's data persists |
+| **3** ✅ | Fairness deficits (the shift planner is not built) | Suggestions are good enough to accept |
+| **4** | Reporting + exports ✅ · read-only share links 🔧 | Head coach opens a link and gets it |
+
+**🔧 = scoped down from this brief and built, not yet exercised against a
+real backend.** Supabase sync here is one-way and manual (the app publishes
+on demand; no background queue, no picking up a live game on a second
+device — see the "Coaches dashboard" section of the main [`README`](./README.md)
+for what that scoping decision was and why), and the read-only share link is
+the [`dashboard/`](./dashboard) site reading it. Both need a real Supabase
+project created and wired in (`app/.env.example`, `dashboard/.env.example`)
+before either is more than typechecked and manually spot-tested.
 
 **Do not skip the "use it in a real game" gate on Phase 1.** One live game will
 invalidate a meaningful fraction of your UI assumptions — better to learn that

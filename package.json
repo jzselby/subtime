@@ -4,13 +4,15 @@
   "version": "0.1.0",
   "workspaces": [
     "core",
-    "app"
+    "app",
+    "dashboard"
   ],
   "scripts": {
     "dev": "npm run dev --workspace app",
     "build": "npm run build --workspace core && npm run build --workspace app",
+    "build:dashboard": "npm run build --workspace core && npm run build --workspace dashboard",
     "test": "npm run test --workspace core",
-    "typecheck": "npm run typecheck --workspace core && npm run typecheck --workspace app",
+    "typecheck": "npm run typecheck --workspace core && npm run typecheck --workspace app && npm run typecheck --workspace dashboard",
     "smoke": "node scripts/smoke.mjs && node scripts/resume.mjs && node scripts/drag.mjs && node scripts/bench-touch.mjs && node scripts/initials.mjs && node scripts/edit.mjs && node scripts/edit-player.mjs && node scripts/clock.mjs && node scripts/export.mjs && node scripts/sheets.mjs && node scripts/roster.mjs && node scripts/endgame.mjs && node scripts/formation-editor.mjs && node scripts/checkfit.mjs && node scripts/season.mjs && node scripts/keyboard.mjs && node scripts/orientation.mjs && node scripts/gk-fairness.mjs",
     "preview": "npm run preview --workspace app"
   },

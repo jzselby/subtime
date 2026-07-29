@@ -14,6 +14,7 @@ import {
   type Team,
 } from '../db';
 import { navigate } from '../router';
+import { dashboardConfigured, dashboardUrl, disableDashboard, enableDashboard, publishNow } from '../sync';
 
 export function TeamScreen({ teamId }: { teamId: string }) {
   const team = useLiveQuery(() => db.teams.get(teamId), [teamId]);
@@ -392,6 +393,46 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
     onClose();
   };
 
+  // `team` is a live-query snapshot from the parent, so once
+  // enable/disable/publish lands locally, this prop re-renders with it —
+  // `justEnabledUrl` only covers the gap before that reactive update
+  // arrives, so the link appears the instant Enable resolves rather than
+  // flickering "not yet enabled" for one render.
+  const [dashBusy, setDashBusy] = useState(false);
+  const [dashError, setDashError] = useState<string | null>(null);
+  const [dashCopied, setDashCopied] = useState(false);
+  const [justEnabledUrl, setJustEnabledUrl] = useState<string | null>(null);
+  const shareUrl = justEnabledUrl ?? dashboardUrl(team);
+
+  const runDashAction = async (action: () => Promise<void>) => {
+    setDashBusy(true);
+    setDashError(null);
+    try {
+      await action();
+    } catch (err) {
+      setDashError((err as Error).message);
+    } finally {
+      setDashBusy(false);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (!shareUrl) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${team.name} — season stats`, url: shareUrl });
+        return;
+      } catch (err) {
+        // A cancelled share sheet throws AbortError; fall through to copy
+        // for anything else, same pattern as Summary.tsx's export flow.
+        if ((err as Error)?.name === 'AbortError') return;
+      }
+    }
+    await navigator.clipboard.writeText(shareUrl);
+    setDashCopied(true);
+    setTimeout(() => setDashCopied(false), 2000);
+  };
+
   return (
     <Sheet title="Team settings" onClose={onClose}>
       <div style={{ display: 'grid', gap: 12 }}>
@@ -450,6 +491,54 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
         <p className="small muted" style={{ marginTop: -6 }}>
           Squad size and positions live on the formation, where you can drag them
           into the shape you actually play.
+        </p>
+
+        {dashboardConfigured &&
+          (team.dashboardEnabled && shareUrl ? (
+            <>
+              <div className="row" style={{ gap: 8 }}>
+                <button className="btn grow" onClick={() => void handleShareLink()}>
+                  {dashCopied ? '✓ Copied' : 'Share link'}
+                </button>
+                <button
+                  className="btn"
+                  disabled={dashBusy}
+                  onClick={() => void runDashAction(() => publishNow(team))}
+                >
+                  Publish now
+                </button>
+              </div>
+              <p className="small muted" style={{ marginTop: -6, wordBreak: 'break-all' }}>
+                {shareUrl}
+              </p>
+              <button
+                className="btn ghost block"
+                disabled={dashBusy}
+                onClick={() => void runDashAction(() => disableDashboard(team))}
+              >
+                Turn off coaches dashboard
+              </button>
+            </>
+          ) : (
+            <button
+              className="btn block"
+              disabled={dashBusy}
+              onClick={() =>
+                void runDashAction(async () => setJustEnabledUrl(await enableDashboard(team)))
+              }
+            >
+              {dashBusy ? 'Setting up…' : 'Share a live dashboard with other coaches'}
+            </button>
+          ))}
+        {dashError && (
+          <p className="small" style={{ color: 'var(--danger)', marginTop: -6 }}>
+            {dashError}
+          </p>
+        )}
+        <p className="small muted" style={{ marginTop: -6 }}>
+          {dashboardConfigured
+            ? 'Full game detail — player names, goals, subs, times — leaves this device once this is on, so another coach can open the link and see it. Turning it off leaves what’s already shared in place; it just stops the link from resolving.'
+            : 'Coaches dashboard isn’t set up in this build yet.'}
         </p>
 
         <button className="btn primary block" onClick={() => void save()}>

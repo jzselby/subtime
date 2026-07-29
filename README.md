@@ -247,16 +247,40 @@ goal, they rejoin the fairness pool — and because their minutes in goal earned
 no credit, they pick up a real target for whatever they play next, on top of
 their keeper spell rather than instead of it.
 
+### Coaches dashboard
+
+**Team settings → Coaches dashboard** publishes a live, read-only link —
+season stats and charts, no login, no install — a coach can hand to another
+coach. Off by default, per team; enabling it is explicit, and the copy says
+plainly what leaves the device once it's on: the full event log, including
+player names, not just totals.
+
+This is one-way. The app publishes; the [`dashboard/`](./dashboard) site — a
+separate, small static page, not part of the installable PWA — reads. Nothing
+here lets a second device pick up a live game; that's a deliberately
+different, much larger problem this doesn't attempt. `supabase/schema.sql`
+has the backend side: two Postgres functions are the only way in or out for
+the public key, one gated by the token in the share link (read), one by a
+key that never leaves the coach's device (write) — see the comments there
+for the reasoning.
+
+**Current state:** built and unit/manually verified without a live backend;
+not yet exercised against a real Supabase project (needs one created and its
+URL/key wired in — see `app/.env.example` and `dashboard/.env.example`).
+Publishing today is a manual **Publish now** tap, not automatic — a
+background sync queue that publishes as you play is the deliberately
+separate next step, not a gap in this one.
+
 ## What doesn't yet
 
-Server sync and multi-device (Phase 2) · the shift **planner** that pre-generates
-a whole rotation, as opposed to the live suggestions that exist now (Phase 3) ·
-read-only share links for the head coach, so season stats don't require handing
-over the phone (Phase 4). See [`DESIGN.md`](./DESIGN.md).
+Full multi-device sync — picking up a live game on a second device — and the
+shift **planner** that pre-generates a whole rotation, as opposed to the live
+suggestions that exist now. See [`DESIGN.md`](./DESIGN.md).
 
-Today the phone holds the only copy of your data. The app asks the browser for
+Today the phone holds the only copy of your data for any team that hasn't
+turned on the coaches dashboard above. The app asks the browser for
 persistent storage, but that is best-effort — export a report after games you
-care about until sync lands.
+care about, or turn the dashboard on, until background sync lands.
 
 ## Testing
 
@@ -282,7 +306,19 @@ node scripts/season.mjs                   # season totals actually sum across ga
 node scripts/keyboard.mjs                 # a sheet's input stays above the keyboard
 node scripts/orientation.mjs              # portrait only, the guard covers everything
 node scripts/gk-fairness.mjs              # "Not at all" really excludes the keeper
+npm run typecheck                         # also covers dashboard/, third workspace
+npm run build:dashboard                   # dashboard/'s own build, separate from app's
 ```
+
+The coaches dashboard has no Playwright script yet — everything above it
+runs against nothing but the local browser, and this is the first feature
+with a real network dependency. It's been checked by hand against a
+deliberately unreachable Supabase URL (confirms `dashboardConfigured`'s
+"not set up" state, and that a failed publish leaves a team correctly
+un-enabled rather than showing a share link nothing's actually behind it),
+but a true round-trip test — publish from a scripted app session, load the
+dashboard, assert the numbers match — needs a real Supabase project and
+belongs here once one exists.
 
 `scripts/smoke.mjs` plays a full two-half game through the actual UI — roster,
 lineup, kickoff, subs, goals, a stoppage, undo, full time — and checks the

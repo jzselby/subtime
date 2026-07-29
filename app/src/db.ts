@@ -6,9 +6,13 @@ import { defaultFormation } from './formations';
 
 /**
  * Local-first storage. Everything a game needs lives here, so a match can be run
- * with no signal at all. Sync to a server is Phase 2 — and because events are
- * immutable and carry client-generated ids, that sync is an upsert by id with no
- * conflict resolution to write.
+ * with no signal at all. This is still the only copy of the data for any team
+ * that hasn't opted into the coaches dashboard (see `sync.ts`) — and even for
+ * one that has, every write lands here first regardless of network state.
+ * Because events are immutable and carry client-generated ids, syncing them
+ * out is a one-way upsert by id with no conflict resolution to write; this
+ * app is never the one reconciling someone else's edits, only ever the
+ * source of truth for a game only it is running.
  */
 
 export interface Team {
@@ -23,6 +27,19 @@ export interface Team {
   formation: Formation;
   config: GameConfig;
   createdAt: number;
+  /**
+   * Off by default. `shareToken`/`publishKey` don't exist until a coach
+   * first enables the dashboard for this team — see `sync.ts` — so both are
+   * optional rather than backfilled for every team on a schema bump; a team
+   * that never opts in never gets either one generated at all.
+   */
+  dashboardEnabled?: boolean;
+  /** The secret in the dashboard URL. Read-only once shared: regenerating it
+   *  would silently break a link a coach has already handed out. */
+  shareToken?: string;
+  /** Stays on this device. Gates writes to this team's row in Supabase —
+   *  never rendered, copied, or shared alongside `shareToken`. */
+  publishKey?: string;
 }
 
 export interface Player {
