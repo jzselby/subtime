@@ -103,8 +103,6 @@ export interface PlayerGameStats {
   onField: boolean;
   goals: number;
   assists: number;
-  /** Goal differential while this player was on the field. */
-  plusMinus: number;
   shots: number;
   shotsOnTarget: number;
   saves: number;
@@ -139,7 +137,6 @@ export function playerStats(state: GameState, nowWallTs: number): PlayerGameStat
     onField: state.onField.has(playerId),
     goals: 0,
     assists: 0,
-    plusMinus: 0,
     shots: 0,
     shotsOnTarget: 0,
     saves: 0,
@@ -168,20 +165,8 @@ export function playerStats(state: GameState, nowWallTs: number): PlayerGameStat
   }
 
   for (const goal of state.goals) {
-    // An own goal is credited to us but counts against us on the scoreboard and
-    // in plus/minus.
-    const against = goal.ownGoal ? true : goal.team === 'them';
     if (goal.scorerId && !goal.ownGoal) row(goal.scorerId).goals += 1;
     if (goal.assistId) row(goal.assistId).assists += 1;
-    for (const stint of state.stints) {
-      if (stint.period !== goal.period) continue;
-      const end = stintEndMs(stint, state, nowWallTs);
-      // Half-open [start, end): a goal at the instant of a sub belongs to the
-      // player coming on, and is counted exactly once.
-      if (goal.clockMs >= stint.startMs && goal.clockMs < end) {
-        row(stint.playerId).plusMinus += against ? -1 : 1;
-      }
-    }
   }
 
   for (const [playerId, s] of state.shots) {
@@ -218,7 +203,6 @@ export interface PlayerSeasonStats {
   positionsPlayed: number;
   goals: number;
   assists: number;
-  plusMinus: number;
   shots: number;
   shotsOnTarget: number;
   saves: number;
@@ -244,7 +228,6 @@ export function aggregatePlayerStats(perGame: readonly PlayerGameStats[][]): Pla
     positionsPlayed: 0,
     goals: 0,
     assists: 0,
-    plusMinus: 0,
     shots: 0,
     shotsOnTarget: 0,
     saves: 0,
@@ -273,7 +256,6 @@ export function aggregatePlayerStats(perGame: readonly PlayerGameStats[][]): Pla
       }
       r.goals += s.goals;
       r.assists += s.assists;
-      r.plusMinus += s.plusMinus;
       r.shots += s.shots;
       r.shotsOnTarget += s.shotsOnTarget;
       r.saves += s.saves;

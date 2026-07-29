@@ -180,7 +180,7 @@ keeper weighting · **a field view with a shirt per position** plus a list view 
 live clock with stoppages · subs and position changes · goals, assists, and
 opponent goals · live fairness ordering and sub suggestions · shift alarm · undo
 and a full event log · per-game report with playing-time bars, a who-was-on-when
-timeline, plus/minus and **minutes in each position by name** · copy-to-clipboard
+timeline, and **minutes in each position by name** · copy-to-clipboard
 summary · **a styled HTML report, or CSV, by download, share sheet or email** ·
 **season totals per player, summed across every game a team has started** ·
 **locked to portrait** · installable, offline, survives a reload mid-game.
@@ -413,8 +413,8 @@ in every sheet is the topmost element at its own centre.
 history, and the CSV formula guard. It retires a player who has played, then
 reads their name back off the summary and the exported CSV; it deletes one who
 never played; it refuses to remove one who is on the pitch mid-match; and it
-checks a player named `=1+1` is defused on CSV export while a negative
-plus/minus stays a number.
+checks a player named `=1+1` is defused on CSV export without mangling the
+rest of the row.
 
 `scripts/endgame.mjs` covers ending a game early. From mid-first-half it checks
 that a quick tap on "Hold to end the game" does nothing, that holding it does,

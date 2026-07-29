@@ -2,7 +2,7 @@ import { elapsedGameMs, fairnessIndex, formatClock, playerStats } from '@touchli
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 import { HoldButton, mins, mmss, Screen, Sheet } from '../components';
-import { db, deleteGame } from '../db';
+import { db, deleteGame, type Game } from '../db';
 import { useGameLog, useNow } from '../hooks';
 import { navigate } from '../router';
 
@@ -31,8 +31,8 @@ const NUMERIC = /^-?\d+(\.\d+)?$/;
  * the raw file scannable in a text preview and not just once it's imported.
  *
  * The formula guard is exempted from that: a value that is simply a number is
- * left alone regardless. `+/-` is legitimately negative, and quoting `-2` as
- * text would break the first SUM the head coach writes.
+ * left alone regardless, so a genuinely negative stat stays a number instead
+ * of text — quoting it would break the first SUM the head coach writes.
  */
 export function csvCell(value: unknown): string {
   const raw = String(value);
@@ -67,6 +67,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
   const [share, setShare] = useState(false);
+  const [editingGame, setEditingGame] = useState(false);
 
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
@@ -153,13 +154,9 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
       csvRow(['Final score', `${team.name} ${state.score.us} – ${game.opponent || 'Opponent'} ${state.score.them}`]),
       csvRow(['Playing-time fairness', `${Math.round(index * 100)}%`]),
       '',
-      // Not "+/-": a header starting with + or - is exactly what the formula
-      // guard below has to catch on a data cell, and it doesn't distinguish a
-      // column label from a player's name — it would have prefixed this one
-      // with an apostrophe too.
       csvRow([
         'Player', 'Number', 'Minutes', 'Bench Minutes', 'Positions Played',
-        'Goals', 'Assists', 'Plus/Minus', 'Shots', 'Saves', 'Stints',
+        'Goals', 'Assists', 'Shots', 'Saves', 'Stints',
       ]),
       ...byMinutes.map((s) =>
         csvRow([
@@ -170,7 +167,6 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
           positionsForCsv(s.msByPosition) || '—',
           s.goals,
           s.assists,
-          s.plusMinus,
           s.shots,
           s.saves,
           s.stintCount,
@@ -206,7 +202,6 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
         <td>${escapeHtml(positionsForCsv(s.msByPosition) || '—')}</td>
         <td class="num">${s.goals || ''}</td>
         <td class="num">${s.assists || ''}</td>
-        <td class="num">${s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus || ''}</td>
         <td class="num">${s.shots || ''}</td>
         <td class="num">${s.saves || ''}</td>
         <td class="num">${s.stintCount}</td>
@@ -257,7 +252,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
     <thead>
       <tr>
         <th>Player</th><th class="num">#</th><th class="num">Min</th><th class="num">Bench</th>
-        <th>Positions</th><th class="num">G</th><th class="num">A</th><th class="num">+/&minus;</th>
+        <th>Positions</th><th class="num">G</th><th class="num">A</th>
         <th class="num">Shots</th><th class="num">Saves</th><th class="num">Stints</th>
       </tr>
     </thead>
@@ -421,6 +416,15 @@ ${rows}
                 Hold to end the game
               </HoldButton>
             )}
+            <button
+              className="btn block"
+              onClick={() => {
+                setMenu(false);
+                setEditingGame(true);
+              }}
+            >
+              Edit game
+            </button>
             <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
               Modify events
             </button>
@@ -439,6 +443,8 @@ ${rows}
           </div>
         </Sheet>
       )}
+
+      {editingGame && <EditGameSheet game={game} onClose={() => setEditingGame(false)} />}
 
       {errors.length > 0 && (
         <div className="banner error">
@@ -530,7 +536,6 @@ ${rows}
               <th>Positions</th>
               <th>G</th>
               <th>A</th>
-              <th>+/−</th>
             </tr>
           </thead>
           <tbody>
@@ -542,9 +547,6 @@ ${rows}
                 <td style={{ textAlign: 'left' }}>{byPosition(s.msByPosition) || '—'}</td>
                 <td>{s.goals || ''}</td>
                 <td>{s.assists || ''}</td>
-                <td className={s.plusMinus > 0 ? '' : s.plusMinus < 0 ? 'muted' : 'muted'}>
-                  {s.plusMinus > 0 ? `+${s.plusMinus}` : s.plusMinus || ''}
-                </td>
               </tr>
             ))}
           </tbody>
@@ -552,8 +554,37 @@ ${rows}
       </div>
       <p className="small muted">
         Positions show how long each player spent in each one — the development
-        record. “+/−” is the goal difference while they were on.
+        record.
       </p>
     </Screen>
+  );
+}
+
+function EditGameSheet({ game, onClose }: { game: Game; onClose: () => void }) {
+  const [opponent, setOpponent] = useState(game.opponent);
+
+  const save = async () => {
+    await db.games.update(game.id, { opponent: opponent.trim() });
+    onClose();
+  };
+
+  return (
+    <Sheet title="Edit game" onClose={onClose}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <label className="field">
+          <span>Opponent</span>
+          <input
+            autoFocus
+            value={opponent}
+            onChange={(e) => setOpponent(e.target.value)}
+            placeholder="Rovers"
+            onKeyDown={(e) => e.key === 'Enter' && void save()}
+          />
+        </label>
+        <button className="btn primary block" onClick={() => void save()}>
+          Save
+        </button>
+      </div>
+    </Sheet>
   );
 }

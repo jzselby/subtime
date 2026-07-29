@@ -28,7 +28,7 @@ const config = defaultConfig({
 
 const { state, errors } = reduce(events, config);
 
-playerStats(state, Date.now());   // minutes, bench, plus/minus, minutes by position
+playerStats(state, Date.now());   // minutes, bench, goals/assists, minutes by position
 fairness(state, Date.now());      // live table, most-owed first
 ```
 
@@ -76,8 +76,7 @@ argument against building this as a web app, does not apply.
 `Stint { playerId, position, period, startMs, endMs }` is the derived primitive,
 half-open on `[startMs, endMs)` so a sub at minute 20 is never counted twice.
 Everything else reads off it: minutes played, bench time, minutes by position
-(development), goal differential while on the field (plus/minus), and the live
-fairness table.
+(development), goals and assists, and the live fairness table.
 
 `fairness.gkWeight` is `1` / `0.5` / `0` — how much a minute in goal counts
 toward a player's own target. `0` means the keeper is *excluded*, not merely

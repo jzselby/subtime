@@ -71,7 +71,6 @@ export function SeasonScreen({ teamId }: { teamId: string }) {
                 <th>Positions</th>
                 <th>G</th>
                 <th>A</th>
-                <th>+/&minus;</th>
               </tr>
             </thead>
             <tbody>
@@ -88,9 +87,6 @@ export function SeasonScreen({ teamId }: { teamId: string }) {
                   <td style={{ textAlign: 'left' }}>{byPosition(r.msByPosition) || '—'}</td>
                   <td>{r.goals || ''}</td>
                   <td>{r.assists || ''}</td>
-                  <td className={r.plusMinus > 0 ? '' : 'muted'}>
-                    {r.plusMinus > 0 ? `+${r.plusMinus}` : r.plusMinus || ''}
-                  </td>
                 </tr>
               ))}
             </tbody>

@@ -17,8 +17,7 @@ export function SeasonView({
   record: TeamRecord;
   onSelectGame: (gameId: string) => void;
 }) {
-  const { team } = snapshot;
-  const { rows, gameCount } = seasonStats(snapshot);
+  const { rows } = seasonStats(snapshot);
   const sorted = [...rows].sort((a, b) => b.playedMs - a.playedMs);
   const nameOf = new Map(snapshot.players.map((p) => [p.id, p.name]));
   const numberOf = new Map(snapshot.players.map((p) => [p.id, p.number]));
@@ -27,12 +26,6 @@ export function SeasonView({
 
   return (
     <>
-      <h1>{team.name}</h1>
-      <p className="muted">
-        {team.age_group ? `${team.age_group} · ` : ''}
-        {gameCount} game{gameCount === 1 ? '' : 's'} this season
-      </p>
-
       {decided > 0 && (
         <div className="kpi-row">
           <div className="stat-tile">
@@ -43,7 +36,7 @@ export function SeasonView({
           </div>
           <div className="stat-tile">
             <span className="stat-label">Games played</span>
-            <span className="stat-value">{gameCount}</span>
+            <span className="stat-value">{games.length}</span>
           </div>
           <div className="stat-tile">
             <span className="stat-label">Goals for</span>
@@ -86,7 +79,6 @@ export function SeasonView({
                 <th style={{ textAlign: 'left' }}>Positions</th>
                 <th style={{ width: '1%' }}>G</th>
                 <th style={{ width: '1%' }}>A</th>
-                <th style={{ width: '1%' }}>+/&minus;</th>
               </tr>
             </thead>
             <tbody>
@@ -103,7 +95,6 @@ export function SeasonView({
                   <td style={{ textAlign: 'left' }}>{byPositionMinutes(r.msByPosition) || '—'}</td>
                   <td>{r.goals || ''}</td>
                   <td>{r.assists || ''}</td>
-                  <td>{r.plusMinus > 0 ? `+${r.plusMinus}` : r.plusMinus || ''}</td>
                 </tr>
               ))}
             </tbody>

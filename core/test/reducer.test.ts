@@ -129,7 +129,7 @@ describe('live clock', () => {
   });
 });
 
-describe('goals and plus/minus', () => {
+describe('goals and assists', () => {
   it('credits goals and assists and scores the game', () => {
     const b = new LogBuilder(cfg)
       .attendance(five)
@@ -148,24 +148,6 @@ describe('goals and plus/minus', () => {
     expect(stats.get('d')?.assists).toBe(1);
     // An own goal is not a goal for the scorer.
     expect(stats.get('b')?.goals).toBe(0);
-    // Everyone was on for all three: +1 scored, -1 conceded, -1 own goal.
-    expect(stats.get('a')?.plusMinus).toBe(-1);
-  });
-
-  it('assigns a goal at a sub boundary to the player coming on', () => {
-    const b = new LogBuilder(cfg)
-      .attendance([...five, ...bench])
-      .lineup(startingSlots)
-      .startPeriod(1)
-      .sub(10 * MIN, ['e'], [{ playerId: 'f', position: 'ST' }])
-      .goal(10 * MIN, 'f')
-      .endPeriod(20 * MIN);
-
-    const { state } = reduce(b.events, cfg);
-    const stats = new Map(playerStats(state, 0).map((s) => [s.playerId, s]));
-    // Half-open [start, end): counted exactly once, for the incoming player.
-    expect(stats.get('f')?.plusMinus).toBe(1);
-    expect(stats.get('e')?.plusMinus).toBe(0);
   });
 });
 

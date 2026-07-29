@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { foldGames, teamRecord } from './games';
 import { GameView } from './GameView';
+import { ScopeSelect } from './ScopeSelect';
 import { SeasonView } from './SeasonView';
 import { useDashboard } from './useDashboard';
 
@@ -86,12 +87,19 @@ export function App() {
   }
 
   const { snapshot } = result;
+  const { team } = snapshot;
   const games = foldGames(snapshot);
   const record = teamRecord(games);
   const selected = gameId ? games.find((g) => g.game.id === gameId) : undefined;
 
   return (
     <Page>
+      <h1>{team.name}</h1>
+      <p className="muted">
+        {team.age_group ? `${team.age_group} · ` : ''}
+        {games.length} game{games.length === 1 ? '' : 's'} this season
+      </p>
+      <ScopeSelect games={games} value={gameId} onChange={setGameId} />
       {selected ? (
         <GameView summary={selected} players={snapshot.players} onBack={() => setGameId(null)} />
       ) : (

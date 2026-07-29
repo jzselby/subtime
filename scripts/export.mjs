@@ -146,7 +146,7 @@ const [header, ...rows] = lines.slice(blank + 1);
 check('CSV filename is safe for a filesystem', /^[\w.-]+\.csv$/.test(csvDl.suggestedFilename()), true);
 check('CSV names the teams and the date', /Export-FC-vs-Rivals-\d{4}-\d{2}-\d{2}\.csv/.test(csvDl.suggestedFilename()), true);
 check('the file identifies the game without the filename', meta.some((l) => l.startsWith('Opponent,Rivals')), true);
-check('header names the columns, unquoted', header, 'Player,Number,Minutes,Bench Minutes,Positions Played,Goals,Assists,Plus/Minus,Shots,Saves,Stints');
+check('header names the columns, unquoted', header, 'Player,Number,Minutes,Bench Minutes,Positions Played,Goals,Assists,Shots,Saves,Stints');
 check('one row per present player', rows.length, 6);
 // Goals is the sixth column; exactly one player should own the one goal.
 const goalsColumn = rows.map((r) => r.split(',')[5]);
