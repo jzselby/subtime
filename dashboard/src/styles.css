@@ -240,6 +240,24 @@ h2 {
   }
 }
 
+/* Goals and assists is a handful of rows, sized to its own content — an
+   even 1fr/1fr split would either starve it or leave Playing time's bars
+   just as cramped as the empty space this is meant to use. Its column
+   only grows as wide as it needs, capped well short of crowding the bars. */
+.gv-pair {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 760px) {
+  .gv-pair {
+    display: grid;
+    grid-template-columns: minmax(220px, 340px) 1fr;
+    gap: 0 24px;
+    align-items: start;
+  }
+}
+
 /* ---------------------------------------------------------------- table -- */
 
 .tbl {

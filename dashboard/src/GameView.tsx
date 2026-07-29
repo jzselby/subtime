@@ -48,59 +48,70 @@ export function GameView({
         {!result && game.status === 'live' && <span className="result-chip live">In progress</span>}
       </p>
 
-      {scorers.length > 0 && (
-        <>
-          <h2>Goals and assists</h2>
-          <div className="card" style={{ overflowX: 'auto' }}>
-            <table className="tbl tbl-compact">
-              <thead>
-                <tr>
-                  <th>Player</th>
-                  <th>G</th>
-                  <th>A</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scorers.map((s) => (
-                  <tr key={s.playerId}>
-                    <td>{nameOf(s.playerId)}</td>
-                    <td>{s.goals || ''}</td>
-                    <td>{s.assists || ''}</td>
+      {/*
+       * Goals and assists is only ever a handful of rows wide — sized to its
+       * own content (.tbl-compact) it leaves a lot of empty card on a wide
+       * screen if it just sits above Playing time full-width. Pairing them
+       * puts that space to use instead of wasting it; below the breakpoint
+       * they fall back to stacked full-width sections like everything else.
+       */}
+      <div className={scorers.length > 0 ? 'gv-pair' : undefined}>
+        {scorers.length > 0 && (
+          <div>
+            <h2>Goals and assists</h2>
+            <div className="card" style={{ overflowX: 'auto' }}>
+              <table className="tbl tbl-compact">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>G</th>
+                    <th>A</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {scorers.map((s) => (
+                    <tr key={s.playerId}>
+                      <td>{nameOf(s.playerId)}</td>
+                      <td>{s.goals || ''}</td>
+                      <td>{s.assists || ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </>
-      )}
+        )}
 
-      <h2>Playing time</h2>
-      {byMinutes.length === 0 ? (
-        <div className="empty">No playing time recorded for this game.</div>
-      ) : (
-        <div className="card" style={{ overflowX: 'auto' }}>
-          <table className="tbl">
-            <tbody>
-              {byMinutes.map((s) => (
-                <tr key={s.playerId}>
-                  <td>
-                    {nameOf(s.playerId)}
-                    {s.positionsPlayed > 0 && (
-                      <span className="small muted" style={{ display: 'block' }}>
-                        {byPositionClock(s.msByPosition)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="bar" style={{ width: '52%' }}>
-                    <span style={{ width: `${(s.playedMs / maxMs) * 100}%` }} />
-                    <em>{mmss(s.playedMs)}</em>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div>
+          <h2>Playing time</h2>
+          {byMinutes.length === 0 ? (
+            <div className="empty">No playing time recorded for this game.</div>
+          ) : (
+            <div className="card" style={{ overflowX: 'auto' }}>
+              <table className="tbl">
+                <tbody>
+                  {byMinutes.map((s) => (
+                    <tr key={s.playerId}>
+                      <td>
+                        {nameOf(s.playerId)}
+                        {s.positionsPlayed > 0 && (
+                          <span className="small muted" style={{ display: 'block' }}>
+                            {byPositionClock(s.msByPosition)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="bar" style={{ width: '52%' }}>
+                        <span style={{ width: `${(s.playedMs / maxMs) * 100}%` }} />
+                        <em>{mmss(s.playedMs)}</em>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <div
         className={`card meter ${fairness >= 0.8 ? 'good' : fairness >= 0.5 ? 'warning' : 'critical'}`}
