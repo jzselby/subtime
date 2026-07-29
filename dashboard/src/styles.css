@@ -285,6 +285,25 @@ h2 {
   border-bottom: 0;
 }
 
+/*
+ * A table with only a name and one or two short numeric columns (goals and
+ * assists) still stretched to the card's full width like every other .tbl —
+ * the browser gives all the leftover space to the one column with real
+ * content (the name), which shoves G/A off at the far edge with a wide gap
+ * of nothing in between, on both a narrow phone and a wide desktop card.
+ * Letting the table size to its own content (default table-layout: auto,
+ * once it isn't forced to width: 100%) keeps the numeric columns snug next
+ * to the name instead.
+ */
+.tbl-compact {
+  width: auto;
+}
+
+.tbl-compact th:first-child,
+.tbl-compact td:first-child {
+  min-width: 0;
+}
+
 .tbl tbody tr:hover td {
   background: var(--page);
 }

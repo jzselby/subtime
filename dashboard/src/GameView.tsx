@@ -52,12 +52,12 @@ export function GameView({
         <>
           <h2>Goals and assists</h2>
           <div className="card" style={{ overflowX: 'auto' }}>
-            <table className="tbl">
+            <table className="tbl tbl-compact">
               <thead>
                 <tr>
                   <th>Player</th>
-                  <th style={{ width: '1%' }}>G</th>
-                  <th style={{ width: '1%' }}>A</th>
+                  <th>G</th>
+                  <th>A</th>
                 </tr>
               </thead>
               <tbody>
