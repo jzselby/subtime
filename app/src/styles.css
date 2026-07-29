@@ -782,7 +782,12 @@ body.sheet-open .actions {
   font-size: 10px;
   font-weight: 700;
   color: #d6ffee;
-  overflow: hidden;
+  white-space: nowrap;
+  /* A short spell (a quick sub, a paused-clock lineup change) is narrower
+     than its own label — let the label spill past the segment's edges
+     rather than hiding it, so every spell still reads its position. */
+  overflow: visible;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 /* ---------------------------------------------------------------- pitch -- */

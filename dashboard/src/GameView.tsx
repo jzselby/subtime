@@ -143,7 +143,7 @@ export function GameView({
                               width: `${Math.max(0.8, ((end - start) / timelineTotal) * 100)}%`,
                             }}
                           >
-                            {(end - start) / timelineTotal > 0.13 ? st.position : ''}
+                            {st.position}
                           </span>
                         );
                       })}
