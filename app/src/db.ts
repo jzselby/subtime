@@ -62,11 +62,24 @@ export interface Game {
   createdAt: number;
 }
 
+/**
+ * One row per team with local changes not yet published to the coaches
+ * dashboard — see `markDirty` below and the flush loop in `sync.ts`. `teamId`
+ * is the primary key, so marking an already-dirty team dirty again is just an
+ * overwrite, not a growing queue: a full publish always sends everything, so
+ * there is nothing more specific than "this team" worth remembering.
+ */
+export interface PendingSyncRow {
+  teamId: string;
+  markedAt: number;
+}
+
 export class PitchsideDb extends Dexie {
   teams!: EntityTable<Team, 'id'>;
   players!: EntityTable<Player, 'id'>;
   games!: EntityTable<Game, 'id'>;
   events!: EntityTable<GameEvent, 'id'>;
+  pendingSync!: EntityTable<PendingSyncRow, 'teamId'>;
 
   constructor() {
     // The literal database name, not the class above it: an existing install's
@@ -109,10 +122,95 @@ export class PitchsideDb extends Dexie {
           });
         }
       });
+
+    // v3 adds the local-only queue background sync uses to track which teams
+    // have unpublished changes. Nothing to migrate — every existing install
+    // just gets an empty table.
+    this.version(3).stores({
+      pendingSync: 'teamId',
+    });
   }
 }
 
 export const db = new PitchsideDb();
+
+/**
+ * Marks a team as having local changes the dashboard hasn't seen yet. A
+ * no-op for a team that has never enabled the dashboard, so every write path
+ * below can call this unconditionally without first checking
+ * `dashboardEnabled` itself — the flush loop in `sync.ts` is the only place
+ * that decides whether a dirty team is actually worth publishing.
+ */
+export async function markDirty(teamId: string): Promise<void> {
+  const team = await db.teams.get(teamId);
+  if (!team?.dashboardEnabled) return;
+  await db.pendingSync.put({ teamId, markedAt: Date.now() });
+  // Lets sync.ts's flush loop react sooner than its next poll, without an
+  // import cycle back into this module.
+  window.dispatchEvent(new Event('pitchside:sync-dirty'));
+}
+
+async function markGameDirty(gameId: string): Promise<void> {
+  const game = await db.games.get(gameId);
+  if (game) await markDirty(game.teamId);
+}
+
+/**
+ * Every create/update/delete against a team's own data marks that team dirty
+ * for the background sync flush loop — registered as table-level hooks,
+ * rather than a `markDirty()` call scattered at each write site, so a write
+ * path added later is covered automatically instead of silently falling
+ * outside sync's notice. Hooks fire inside the write's own transaction, which
+ * for events (see `recordMany`/`undo` in hooks.ts) is scoped to `db.events`
+ * alone — so the actual dirty-marking happens in `onsuccess`, which Dexie
+ * runs after that transaction has committed. `Dexie.ignoreTransaction` is
+ * required there: without it, the async read/write against
+ * `teams`/`games`/`pendingSync` still runs inside the ambient zone of the
+ * *original*, by-then-already-closing transaction and throws
+ * (`InvalidStateError`/`NotFoundError`) instead of opening its own.
+ */
+db.teams.hook('creating', function (primKey) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(String(primKey)));
+});
+db.teams.hook('updating', function (_mods, primKey) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(String(primKey)));
+});
+db.teams.hook('deleting', function (primKey) {
+  // Nothing left to resync for a deleted team — drop any queued publish
+  // instead of marking it dirty again.
+  this.onsuccess = () =>
+    Dexie.ignoreTransaction(() => void db.pendingSync.delete(String(primKey)));
+});
+
+db.players.hook('creating', function (_primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(obj.teamId));
+});
+db.players.hook('updating', function (_mods, _primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(obj.teamId));
+});
+db.players.hook('deleting', function (_primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(obj.teamId));
+});
+
+db.games.hook('creating', function (_primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(obj.teamId));
+});
+db.games.hook('updating', function (_mods, _primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(obj.teamId));
+});
+db.games.hook('deleting', function (_primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markDirty(obj.teamId));
+});
+
+db.events.hook('creating', function (_primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markGameDirty(obj.gameId));
+});
+db.events.hook('updating', function (_mods, _primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markGameDirty(obj.gameId));
+});
+db.events.hook('deleting', function (_primKey, obj) {
+  this.onsuccess = () => Dexie.ignoreTransaction(() => void markGameDirty(obj.gameId));
+});
 
 export const uid = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;

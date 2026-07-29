@@ -9,10 +9,15 @@ import { db, uid, type Team } from './db';
  * there's no coach login: `shareToken` gates reads (goes in the URL),
  * `publishKey` gates writes (stays on this device, never shown).
  *
- * This is step 2 of the phased build: `publishNow` is a manual, full
- * resync — there is no background queue yet, so "live" today means
- * "re-tap Publish." That queue (a `pendingSync` table plus hooks on every
- * write) is the deliberately separate next step, not an oversight here.
+ * `publishNow` is always a full resync of one team's players/games/events,
+ * never a delta — `publish_team_data`'s deletion pass for events relies on
+ * that (see the comment in supabase/schema.sql). `startBackgroundSync`
+ * builds "live" on top of that same full-resync call rather than replacing
+ * it: db.ts's table hooks mark a team dirty in `pendingSync` on every write,
+ * and the flush loop here just calls `publishNow` again for whichever teams
+ * are dirty, on a timer and on `online`/visibility/dirty events. A coach
+ * never has to remember to tap Publish, and nothing here blocks or delays
+ * the local write that triggered it — the flush always happens after.
  */
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -149,4 +154,73 @@ export async function disableDashboard(team: Team): Promise<void> {
     data: { team: { dashboard_enabled: false } },
   });
   if (error) throw new Error(error.message);
+}
+
+/**
+ * One pass over every dirty team: publish it, or — if it turns out not to be
+ * enabled, or its tokens are missing (e.g. `enableDashboard` never actually
+ * finished) — just drop the queue entry, since there is nothing valid to
+ * publish it with. A team whose publish fails (offline, a transient error)
+ * stays queued and is retried on the next pass; the failure never reaches
+ * the coach, since nothing here runs on the UI's critical path.
+ */
+async function flushPendingSync(): Promise<void> {
+  const rows = await db.pendingSync.toArray();
+  for (const row of rows) {
+    const team = await db.teams.get(row.teamId);
+    if (!team?.dashboardEnabled || !team.publishKey || !team.shareToken) {
+      await db.pendingSync.delete(row.teamId);
+      continue;
+    }
+    try {
+      await publishNow(team);
+      await db.pendingSync.delete(row.teamId);
+    } catch {
+      // Left queued on purpose — the next timer tick, reconnect, or dirty
+      // write tries again. A coach mid-game should never see this.
+    }
+  }
+}
+
+let flushInFlight: Promise<void> | null = null;
+
+/** Coalesces overlapping triggers (timer + online + dirty-write) into one pass. */
+function requestFlush(): void {
+  if (!dashboardConfigured) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  flushInFlight ??= flushPendingSync().finally(() => {
+    flushInFlight = null;
+  });
+}
+
+/**
+ * Starts the background sync flush loop: an immediate pass, then a timer
+ * every 20s (matching how often the dashboard itself polls, so the two
+ * together stay within about 40s of "live"), plus early triggers on
+ * reconnect, on the tab becoming visible again, and on the
+ * `pitchside:sync-dirty` event `markDirty` (in db.ts) fires right after a
+ * write — so an active coach sees a change propagate well under the timer's
+ * 20s, without polling harder than that in the idle case. A no-op build
+ * with no Supabase config returns a no-op cleanup.
+ */
+export function startBackgroundSync(): () => void {
+  if (!dashboardConfigured) return () => {};
+
+  requestFlush();
+  const onDirty = () => requestFlush();
+  const onOnline = () => requestFlush();
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') requestFlush();
+  };
+  window.addEventListener('pitchside:sync-dirty', onDirty);
+  window.addEventListener('online', onOnline);
+  document.addEventListener('visibilitychange', onVisible);
+  const timer = window.setInterval(requestFlush, 20_000);
+
+  return () => {
+    window.removeEventListener('pitchside:sync-dirty', onDirty);
+    window.removeEventListener('online', onOnline);
+    document.removeEventListener('visibilitychange', onVisible);
+    window.clearInterval(timer);
+  };
 }
