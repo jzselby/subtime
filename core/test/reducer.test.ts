@@ -53,6 +53,26 @@ describe('stint fold', () => {
     expect(playerStats(state, 0)[0]?.playedMs).toBe(15 * MIN);
   });
 
+  it('credits a player subbed on while paused once play resumes', () => {
+    // A lineup change made during a break (e.g. a water break) subs a player
+    // on while the clock is paused. Their stint must not be lost — it should
+    // start ticking the moment the clock resumes, same as a fresh period.
+    const b = new LogBuilder(cfg)
+      .attendance([...five, ...bench])
+      .lineup(startingSlots)
+      .startPeriod(1)
+      .pause(5 * MIN)
+      .sub(5 * MIN, ['e'], [{ playerId: 'f', position: 'ST' }])
+      .resume()
+      .endPeriod(20 * MIN);
+
+    const { state, errors } = reduce(b.events, cfg);
+    expect(errors).toEqual([]);
+    const stats = new Map(playerStats(state, 0).map((s) => [s.playerId, s]));
+    expect(stats.get('e')?.playedMs).toBe(5 * MIN);
+    expect(stats.get('f')?.playedMs).toBe(15 * MIN);
+  });
+
   it('does not double-count a player across a sub boundary', () => {
     const b = new LogBuilder(cfg)
       .attendance([...five, ...bench])

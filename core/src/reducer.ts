@@ -266,6 +266,10 @@ function applyEvent(s: GameStateShape, e: GameEvent): string | null {
       if (s.status !== 'paused') return 'clock is not paused';
       s.status = 'running';
       s.anchor = { wallTs: e.wallTs, clockMs: s.clockMs };
+      // A sub made while paused puts a player onField but, per putOn, opens no
+      // stint until the clock is running — same gap PERIOD_START closes for a
+      // new period, closed here for a lineup changed during a break.
+      for (const [playerId, position] of s.onField) openStint(s, playerId, position, s.clockMs);
       break;
     }
 
