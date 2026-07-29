@@ -313,6 +313,7 @@ h2 {
 }
 
 .bar-track {
+  display: block;
   height: 8px;
   border-radius: 4px;
   background: var(--line);
@@ -320,6 +321,14 @@ h2 {
 }
 
 .bar-fill {
+  /* Both spans in this pair need this: a <span> defaults to display:
+     inline, and an inline element's `width` (including the percentage
+     this bar's whole value depends on) is ignored per spec — it renders
+     at its inline content width, i.e. 0, regardless of the style attribute.
+     .bar-track happened to get a real width anyway because it's a direct
+     CSS grid item (forced to block-outside by the grid spec); .bar-fill,
+     one level further in, gets no such promotion and needs it explicitly. */
+  display: block;
   height: 100%;
   border-radius: 4px;
   background: var(--series-1);
@@ -676,23 +685,3 @@ h2 {
   overflow: hidden;
 }
 
-/* --------------------------------------------------------------- scorers -- */
-
-.scorer-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 13.5px;
-}
-
-.scorer-name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.scorer-row:last-child {
-  border-bottom: 0;
-}

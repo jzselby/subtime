@@ -21,7 +21,9 @@ export function GameView({
   const stats = playerStats(state, now).filter((s) => state.attendance.get(s.playerId) !== 'absent');
   const byMinutes = [...stats].sort((a, b) => b.playedMs - a.playedMs);
   const maxMs = Math.max(1, ...byMinutes.map((s) => s.playedMs));
-  const scorers = stats.filter((s) => s.goals > 0 || s.assists > 0);
+  const scorers = stats
+    .filter((s) => s.goals > 0 || s.assists > 0)
+    .sort((a, b) => b.goals - a.goals || b.assists - a.assists);
 
   const offsets = periodOffsets(state);
   const timelineTotal = Math.max(1, elapsedGameMs(state, now));
@@ -62,6 +64,32 @@ export function GameView({
           most-played player's minutes.
         </span>
       </div>
+
+      {scorers.length > 0 && (
+        <>
+          <h2>Goals and assists</h2>
+          <div className="card" style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th style={{ width: '1%' }}>G</th>
+                  <th style={{ width: '1%' }}>A</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scorers.map((s) => (
+                  <tr key={s.playerId}>
+                    <td>{nameOf(s.playerId)}</td>
+                    <td>{s.goals || ''}</td>
+                    <td>{s.assists || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <h2>Playing time</h2>
       {byMinutes.length === 0 ? (
@@ -126,24 +154,6 @@ export function GameView({
             <p className="small muted" style={{ marginTop: 8 }}>
               Each bar is one spell on the field. Labels show the position.
             </p>
-          </div>
-        </>
-      )}
-
-      {scorers.length > 0 && (
-        <>
-          <h2>Goals and assists</h2>
-          <div className="card">
-            {scorers.map((s) => (
-              <div key={s.playerId} className="scorer-row">
-                <span className="scorer-name">{nameOf(s.playerId)}</span>
-                <span className="small muted">
-                  {[s.goals ? `${s.goals}G` : '', s.assists ? `${s.assists}A` : '']
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </div>
-            ))}
           </div>
         </>
       )}

@@ -18,10 +18,13 @@ export function SeasonView({
   onSelectGame: (gameId: string) => void;
 }) {
   const { rows } = seasonStats(snapshot);
-  const sorted = [...rows].sort((a, b) => b.playedMs - a.playedMs);
+  const byGoals = [...rows].sort(
+    (a, b) => b.goals - a.goals || b.assists - a.assists || b.playedMs - a.playedMs,
+  );
+  const byMinutes = [...rows].sort((a, b) => b.playedMs - a.playedMs);
   const nameOf = new Map(snapshot.players.map((p) => [p.id, p.name]));
   const numberOf = new Map(snapshot.players.map((p) => [p.id, p.number]));
-  const maxMs = Math.max(1, ...sorted.map((r) => r.playedMs));
+  const maxMs = Math.max(1, ...rows.map((r) => r.playedMs));
   const decided = record.wins + record.losses + record.draws;
 
   return (
@@ -76,7 +79,7 @@ export function SeasonView({
       <div className="wide-pair">
         <div>
           <h2>Season stats</h2>
-          {sorted.length === 0 ? (
+          {byGoals.length === 0 ? (
             <div className="empty">No games played yet this season.</div>
           ) : (
             <div className="card" style={{ overflowX: 'auto' }}>
@@ -92,7 +95,7 @@ export function SeasonView({
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((r) => (
+                  {byGoals.map((r) => (
                     <tr key={r.playerId}>
                       <td>
                         {numberOf.get(r.playerId) && (
@@ -116,7 +119,7 @@ export function SeasonView({
         <div>
           <h2>Minutes this season</h2>
           <div className="card">
-            {sorted.map((r) => (
+            {byMinutes.map((r) => (
               <div className="bar-row" key={r.playerId}>
                 <span className="small bar-name" title={nameOf.get(r.playerId) ?? r.playerId}>
                   {nameOf.get(r.playerId) ?? r.playerId}
