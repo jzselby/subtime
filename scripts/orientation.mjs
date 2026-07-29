@@ -39,7 +39,7 @@ page.on('pageerror', (e) => {
 });
 
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 
 const guardDisplay = () =>
   page.evaluate(() => getComputedStyle(document.querySelector('.landscape-guard')).display);

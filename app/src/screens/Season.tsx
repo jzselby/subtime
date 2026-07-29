@@ -1,4 +1,4 @@
-import { aggregatePlayerStats, playerStats, reduce } from '@touchline/core';
+import { aggregatePlayerStats, playerStats, reduce } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
 import { mins, Screen } from '../components';

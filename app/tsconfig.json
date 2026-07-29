@@ -16,7 +16,7 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["vite/client", "vite-plugin-pwa/client"],
     "paths": {
-      "@touchline/core": ["../core/src/index.ts"]
+      "@pitchside/core": ["../core/src/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

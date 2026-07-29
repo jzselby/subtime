@@ -5,7 +5,7 @@ import {
   stintDurationMs,
   stintEndMs,
   type GameState,
-} from '@touchline/core';
+} from '@pitchside/core';
 import type { DashboardGame, DashboardSnapshot } from './types';
 
 export interface GameSummary {

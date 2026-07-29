@@ -19,7 +19,7 @@ p.on('dialog', (d) => d.accept());
 const shot = (n) => p.screenshot({ path: `${OUT}/${tag}-${n}.png` });
 
 await p.goto(URL);
-await p.waitForSelector('text=Touchline');
+await p.waitForSelector('text=Pitchside');
 await p.click('text=+ New team');
 await p.fill('input[placeholder="Thunder"]', 'Riverside Rockets');
 await p.selectOption('.sheet select', String(SIZE));

@@ -20,7 +20,7 @@ for (const [label, w, h] of DEVICES) {
   const p = await ctx.newPage();
   p.on('pageerror', e => console.log('PAGE ERROR:', e.message));
   await p.goto('http://localhost:4173');
-  await p.waitForSelector('text=Touchline');
+  await p.waitForSelector('text=Pitchside');
   await p.click('text=+ New team');
   await p.fill('input[placeholder="Thunder"]', 'Fit');
   await p.selectOption('.sheet select', String(size));

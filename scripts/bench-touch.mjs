@@ -81,7 +81,7 @@ const rightmostBox = async (locator) => {
 const NAMES = ['Ana', 'Bea', 'Cal', 'Dee', 'Eli', 'Fin', 'Gus', 'Hal', 'Ivy', 'Jo', 'Kit', 'Lou', 'Mac', 'Nia'];
 
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 await page.click('text=+ New team');
 await page.fill('input[placeholder="Thunder"]', 'Touch FC');
 await page.selectOption('.sheet select', '5');

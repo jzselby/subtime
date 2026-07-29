@@ -1,4 +1,4 @@
-import { elapsedGameMs, playerStats } from '@touchline/core';
+import { elapsedGameMs, playerStats } from '@pitchside/core';
 import { byPositionClock, mmss } from './format';
 import { periodOffsets, stintDurationMs, stintEndMs, type GameSummary } from './games';
 import type { DashboardPlayer } from './types';

@@ -1,4 +1,4 @@
-import { formatClock } from '@touchline/core';
+import { formatClock } from '@pitchside/core';
 
 export { formatClock as mmss };
 

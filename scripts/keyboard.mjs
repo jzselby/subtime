@@ -55,7 +55,7 @@ page.on('pageerror', (e) => {
 });
 
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 
 // -- before any keyboard, the sheet spans the full window --------------------
 await page.click('text=+ New team');

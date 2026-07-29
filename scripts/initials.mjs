@@ -32,7 +32,7 @@ page.on('pageerror', (e) => {
 page.on('dialog', (d) => d.accept());
 
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 await page.click('text=+ New team');
 await page.fill('input[placeholder="Thunder"]', 'Initials FC');
 await page.selectOption('.sheet select', '5');

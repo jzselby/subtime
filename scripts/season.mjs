@@ -30,7 +30,7 @@ page.on('pageerror', (e) => {
 page.on('dialog', (d) => d.accept());
 
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 
 // -- a team with an exact 5-a-side roster, so nobody sits every game out ----
 await page.click('text=+ New team');

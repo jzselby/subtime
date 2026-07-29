@@ -36,7 +36,7 @@ page.on('pageerror', (e) => {
 });
 
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 
 await page.click('text=+ New team');
 await page.fill('input[placeholder="Thunder"]', 'Resume FC');

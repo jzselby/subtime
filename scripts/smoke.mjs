@@ -53,7 +53,7 @@ page.on('console', (msg) => {
 
 console.log(`\nDriving ${URL}\n`);
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 
 // -- team ------------------------------------------------------------------
 await page.click('text=+ New team');

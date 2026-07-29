@@ -1,10 +1,10 @@
-# @touchline/dashboard
+# @pitchside/dashboard
 
 The coaches dashboard: a small, always-online, read-only site — not part of
 the installable PWA in `../app`, and holds no local data of its own. A coach
 opens a link (`?t=<share token>`), this fetches that one team's data from
 Supabase, and renders season stats the same way `../app/src/screens/Season.tsx`
-does — literally the same `@touchline/core` fold, just fed remote events
+does — literally the same `@pitchside/core` fold, just fed remote events
 instead of Dexie's. See `../supabase/schema.sql` for the backend side and
 `../DESIGN.md`'s "Coaches dashboard" section for the reasoning.
 

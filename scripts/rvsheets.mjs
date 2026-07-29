@@ -3,7 +3,7 @@ const OUT='/home/user/subtime/scripts/shots/rv';
 const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
 const ctx=await b.newContext({viewport:{width:375,height:667},deviceScaleFactor:2});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
-await p.goto('http://localhost:4173'); await p.waitForSelector('text=Touchline');
+await p.goto('http://localhost:4173'); await p.waitForSelector('text=Pitchside');
 await p.click('text=+ New team'); await p.fill('input[placeholder="Thunder"]','T');
 await p.selectOption('.sheet select','9'); await p.click('text=Create team');
 await p.waitForSelector('text=Roster · 0'); await p.click('text=+ Add player');

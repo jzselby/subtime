@@ -36,7 +36,7 @@ function Page({ children }: { children: ReactNode }) {
   return (
     <div className="page">
       <div className="topbar">
-        <span className="brand">Touchline · Coaches Dashboard</span>
+        <span className="brand">Pitchside · Coaches Dashboard</span>
       </div>
       {children}
     </div>

@@ -1,4 +1,4 @@
-import { aggregatePlayerStats, playerStats, reduce, type PlayerSeasonStats } from '@touchline/core';
+import { aggregatePlayerStats, playerStats, reduce, type PlayerSeasonStats } from '@pitchside/core';
 import type { DashboardSnapshot } from './types';
 
 /**

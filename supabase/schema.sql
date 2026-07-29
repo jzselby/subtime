@@ -1,4 +1,4 @@
--- Touchline coaches dashboard: schema, RLS, and the two RPC functions that
+-- Pitchside coaches dashboard: schema, RLS, and the two RPC functions that
 -- are the only way in or out for the anon key. See DESIGN.md §4/§5/§7 and
 -- the plan this implements for the reasoning; the short version is: no
 -- coach login, so a per-team `share_token` gates reads (the dashboard URL)

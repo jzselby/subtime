@@ -1,5 +1,5 @@
-import type { GameConfig, GameEvent } from '@touchline/core';
-import { appearsInLog, defaultConfig, reduce } from '@touchline/core';
+import type { GameConfig, GameEvent } from '@pitchside/core';
+import { appearsInLog, defaultConfig, reduce } from '@pitchside/core';
 import Dexie, { type EntityTable } from 'dexie';
 import type { Formation } from './formations';
 import { defaultFormation } from './formations';
@@ -62,7 +62,7 @@ export interface Game {
   createdAt: number;
 }
 
-export class TouchlineDb extends Dexie {
+export class PitchsideDb extends Dexie {
   teams!: EntityTable<Team, 'id'>;
   players!: EntityTable<Player, 'id'>;
   games!: EntityTable<Game, 'id'>;
@@ -112,7 +112,7 @@ export class TouchlineDb extends Dexie {
   }
 }
 
-export const db = new TouchlineDb();
+export const db = new PitchsideDb();
 
 export const uid = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;

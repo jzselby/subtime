@@ -58,7 +58,7 @@ await page.addInitScript(() => {
 });
 
 await page.goto(URL);
-await page.waitForSelector('text=Touchline');
+await page.waitForSelector('text=Pitchside');
 
 // -- a game with something worth exporting ---------------------------------
 await page.click('text=+ New team');

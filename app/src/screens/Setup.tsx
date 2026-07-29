@@ -1,4 +1,4 @@
-import type { PlayerSlot } from '@touchline/core';
+import type { PlayerSlot } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { initials, minutesOf, Screen, Sheet } from '../components';

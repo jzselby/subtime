@@ -10,7 +10,7 @@ export default defineConfig({
     alias: {
       // Point at core's source, not its build output, so `npm run dev` needs
       // no separate build step — same as app/vite.config.ts.
-      '@touchline/core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
+      '@pitchside/core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
     },
   },
   plugins: [react()],

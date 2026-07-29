@@ -1,4 +1,4 @@
-import type { GameConfig, GameEvent } from '@touchline/core';
+import type { GameConfig, GameEvent } from '@pitchside/core';
 
 /** The exact shape `get_team_dashboard()` returns — see supabase/schema.sql. */
 export interface DashboardTeam {

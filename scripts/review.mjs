@@ -24,7 +24,7 @@ for (const [tag, w, h] of DEVICES) {
   const shot = (n) => p.screenshot({ path: `${OUT}/${tag}-${size}-${n}.png` });
 
   await p.goto(URL);
-  await p.waitForSelector('text=Touchline');
+  await p.waitForSelector('text=Pitchside');
   await shot('00-home-empty');
 
   await p.click('text=+ New team');

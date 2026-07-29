@@ -1,4 +1,4 @@
-# @touchline/core
+# @pitchside/core
 
 The game engine: event log, reducer, stint fold, and derived stats. No React, no
 database, no platform APIs — the same code runs in the PWA, in tests, and
@@ -19,7 +19,7 @@ A game is an **immutable, append-only event log**. Everything else is derived by
 folding it. Nothing ticks; no counter is ever incremented in place.
 
 ```ts
-import { reduce, appendEvent, playerStats, fairness, defaultConfig } from '@touchline/core';
+import { reduce, appendEvent, playerStats, fairness, defaultConfig } from '@pitchside/core';
 
 const config = defaultConfig({
   periods: { count: 2, lengthMs: 30 * 60_000, fieldPlayers: 9 },

@@ -1,4 +1,4 @@
-# Touchline
+# Pitchside
 
 Playing time, substitutions, and stats for youth soccer. An offline-first PWA
 you install on your phone and run from the sideline.

@@ -1,5 +1,5 @@
-import type { GameEvent, PlayerSlot } from '@touchline/core';
-import { clockAt, fairness, formatClock, playerStats } from '@touchline/core';
+import type { GameEvent, PlayerSlot } from '@pitchside/core';
+import { clockAt, fairness, formatClock, playerStats } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {

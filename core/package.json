@@ -1,5 +1,5 @@
 {
-  "name": "@touchline/core",
+  "name": "@pitchside/core",
   "version": "0.1.0",
   "description": "Framework-free game engine: event log, reducer, stint fold, and stats for youth soccer game management.",
   "type": "module",
