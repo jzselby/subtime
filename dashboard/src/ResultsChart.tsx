@@ -14,8 +14,33 @@ export function ResultsChart({ games }: { games: readonly GameSummary[] }) {
     ...chronological.map((g) => Math.abs(g.state.score.us - g.state.score.them)),
   );
 
+  const hasLive = chronological.some((g) => g.result === null);
+  const hasDraw = chronological.some((g) => g.result === 'D');
+
   return (
     <div className="card">
+      <div className="legend">
+        <span className="legend-item">
+          <span className="legend-swatch" style={{ background: 'var(--good)' }} />
+          Win
+        </span>
+        <span className="legend-item">
+          <span className="legend-swatch" style={{ background: 'var(--critical)' }} />
+          Loss
+        </span>
+        {hasDraw && (
+          <span className="legend-item">
+            <span className="legend-swatch" style={{ background: 'var(--muted)' }} />
+            Draw
+          </span>
+        )}
+        {hasLive && (
+          <span className="legend-item">
+            <span className="legend-swatch" style={{ background: 'var(--series-1)' }} />
+            In progress
+          </span>
+        )}
+      </div>
       <div className="results-chart">
         {chronological.map((g) => {
           const diff = g.state.score.us - g.state.score.them;

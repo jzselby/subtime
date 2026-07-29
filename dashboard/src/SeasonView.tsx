@@ -34,27 +34,33 @@ export function SeasonView({
       </p>
 
       {decided > 0 && (
-        <div className="card record-card">
-          <div className="record-stat">
-            <span className="record-num">
+        <div className="kpi-row">
+          <div className="stat-tile">
+            <span className="stat-label">Record</span>
+            <span className="stat-value">
               {record.wins}-{record.losses}-{record.draws}
             </span>
-            <span className="small muted">W-L-D</span>
           </div>
-          <div className="record-stat">
-            <span className="record-num">{record.goalsFor}</span>
-            <span className="small muted">Goals for</span>
+          <div className="stat-tile">
+            <span className="stat-label">Games played</span>
+            <span className="stat-value">{gameCount}</span>
           </div>
-          <div className="record-stat">
-            <span className="record-num">{record.goalsAgainst}</span>
-            <span className="small muted">Goals against</span>
+          <div className="stat-tile">
+            <span className="stat-label">Goals for</span>
+            <span className="stat-value">{record.goalsFor}</span>
           </div>
-          <div className="record-stat">
-            <span className="record-num">
+          <div className="stat-tile">
+            <span className="stat-label">Goals against</span>
+            <span className="stat-value">{record.goalsAgainst}</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-label">Goal diff</span>
+            <span
+              className={`stat-value${record.goalsFor - record.goalsAgainst > 0 ? ' good' : record.goalsFor - record.goalsAgainst < 0 ? ' critical' : ''}`}
+            >
               {record.goalsFor - record.goalsAgainst > 0 ? '+' : ''}
               {record.goalsFor - record.goalsAgainst}
             </span>
-            <span className="small muted">Goal diff</span>
           </div>
         </div>
       )}
@@ -75,12 +81,12 @@ export function SeasonView({
             <thead>
               <tr>
                 <th>Player</th>
-                <th>GP</th>
-                <th>Min</th>
-                <th>Positions</th>
-                <th>G</th>
-                <th>A</th>
-                <th>+/&minus;</th>
+                <th style={{ width: '1%' }}>GP</th>
+                <th style={{ width: '1%' }}>Min</th>
+                <th style={{ textAlign: 'left' }}>Positions</th>
+                <th style={{ width: '1%' }}>G</th>
+                <th style={{ width: '1%' }}>A</th>
+                <th style={{ width: '1%' }}>+/&minus;</th>
               </tr>
             </thead>
             <tbody>

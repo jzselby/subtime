@@ -1,13 +1,44 @@
+/*
+ * A BI-tool look, not the main app's dark game-day chrome: light surfaces,
+ * a data-dense grid of stat tiles, thin bars with rounded data-ends. Colors
+ * are the validated default palette from the project's dataviz skill —
+ * categorical slots, a fixed status set (good/warning/critical), one
+ * sequential hue for plain magnitude — not picked by eye.
+ */
 :root {
-  --bg: #0f1720;
-  --surface: #172230;
-  --surface-2: #1f2d3d;
-  --line: #2b3a4d;
-  --text: #e8f0f5;
-  --muted: #8ba0b5;
-  --accent: #38bd8a;
-  --accent-dim: #1f6b52;
-  --danger: #e5484d;
+  color-scheme: light;
+  --surface: #fcfcfb;
+  --page: #f4f4f2;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --muted: #898781;
+  --line: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --series-1: #2a78d6; /* blue — the default single hue for plain magnitude */
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface: #1a1a19;
+    --page: #121212;
+    --text: #ffffff;
+    --text-2: #c3c2b7;
+    --muted: #898781;
+    --line: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+
+    --series-1: #3987e5;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #e66767;
+  }
 }
 
 * {
@@ -16,15 +47,15 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--page);
   color: var(--text);
-  font: 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 .page {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: 0 20px 56px;
 }
 
 .muted {
@@ -35,35 +66,103 @@ body {
   font-size: 13px;
 }
 
+/* --------------------------------------------------------------- header -- */
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 16px 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 h1 {
-  font-size: 22px;
-  margin: 0 0 2px;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 20px 0 2px;
+  letter-spacing: -0.01em;
 }
 
 h2 {
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--muted);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  margin: 28px 0 8px;
+  margin: 32px 0 10px;
 }
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(11, 11, 11, 0.04);
+  padding: 14px;
 }
+
+/* ----------------------------------------------------------------- kpis -- */
+
+.kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stat-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(11, 11, 11, 0.04);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 110px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: proportional-nums;
+  letter-spacing: -0.01em;
+}
+
+.stat-value.good {
+  color: var(--good);
+}
+
+.stat-value.critical {
+  color: var(--critical);
+}
+
+/* ---------------------------------------------------------------- table -- */
 
 .tbl {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .tbl th,
 .tbl td {
-  padding: 9px 6px;
+  padding: 10px 8px;
   text-align: right;
   border-bottom: 1px solid var(--line);
   font-variant-numeric: tabular-nums;
@@ -72,8 +171,9 @@ h2 {
 
 .tbl th {
   font-size: 11px;
+  font-weight: 600;
   color: var(--muted);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -87,32 +187,40 @@ h2 {
   border-bottom: 0;
 }
 
+.tbl tbody tr:hover td {
+  background: var(--page);
+}
+
+/* --------------------------------------------------------- minutes bars -- */
+
 .bar-row {
   display: grid;
-  grid-template-columns: 90px 1fr 42px;
+  grid-template-columns: 96px 1fr 44px;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  gap: 10px;
+  padding: 5px 0;
 }
 
 .bar-track {
-  height: 10px;
-  border-radius: 5px;
+  height: 8px;
+  border-radius: 4px;
   background: var(--line);
   overflow: hidden;
 }
 
 .bar-fill {
   height: 100%;
-  background: var(--accent);
+  border-radius: 4px;
+  background: var(--series-1);
 }
 
 .empty {
   padding: 28px 16px;
   text-align: center;
   color: var(--muted);
+  font-size: 13.5px;
   border: 1px dashed var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 /* -------------------------------------------------------------- back link -- */
@@ -123,8 +231,9 @@ h2 {
   border: 0;
   color: var(--muted);
   font-size: 13px;
+  font-weight: 600;
   padding: 0;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   cursor: pointer;
 }
 
@@ -132,19 +241,102 @@ h2 {
   color: var(--text);
 }
 
-/* --------------------------------------------------------------- banner -- */
+/* ---------------------------------------------------------------- meter -- */
 
-.banner {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
-  font-size: 13px;
+/* Fairness, as a meter rather than a callout box: the track is a lighter
+   step of the fill's own ramp so severity reads across the whole bar, per
+   the meter contract in the dataviz skill. */
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.banner.ok {
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  border-color: var(--accent-dim);
+.meter-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.meter-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.meter-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: proportional-nums;
+}
+
+.meter-track {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.meter.good .meter-value {
+  color: var(--good);
+}
+.meter.good .meter-track {
+  background: color-mix(in srgb, var(--good) 18%, var(--surface));
+}
+.meter.good .meter-fill {
+  background: var(--good);
+}
+
+.meter.warning .meter-value {
+  color: color-mix(in srgb, var(--warning) 70%, black);
+}
+.meter.warning .meter-track {
+  background: color-mix(in srgb, var(--warning) 22%, var(--surface));
+}
+.meter.warning .meter-fill {
+  background: var(--warning);
+}
+
+.meter.critical .meter-value {
+  color: var(--critical);
+}
+.meter.critical .meter-track {
+  background: color-mix(in srgb, var(--critical) 16%, var(--surface));
+}
+.meter.critical .meter-fill {
+  background: var(--critical);
+}
+
+.meter-caption {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+/* --------------------------------------------------------------- legend -- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
 }
 
 /* ------------------------------------------------------------ result chip -- */
@@ -158,50 +350,29 @@ h2 {
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  background: var(--surface-2);
+  background: var(--page);
   color: var(--muted);
   vertical-align: middle;
 }
 
 .result-chip.w {
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-  color: var(--accent);
+  background: color-mix(in srgb, var(--good) 14%, var(--surface));
+  color: var(--good);
 }
 
 .result-chip.l {
-  background: color-mix(in srgb, var(--danger) 20%, var(--surface));
-  color: #ff8f92;
+  background: color-mix(in srgb, var(--critical) 12%, var(--surface));
+  color: var(--critical);
 }
 
 .result-chip.d {
-  background: var(--surface-2);
+  background: var(--page);
   color: var(--muted);
 }
 
 .result-chip.live {
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  color: var(--accent);
-}
-
-/* -------------------------------------------------------------- record -- */
-
-.record-card {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  text-align: center;
-}
-
-.record-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.record-num {
-  font-size: 20px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--series-1) 14%, var(--surface));
+  color: var(--series-1);
 }
 
 /* ------------------------------------------------------------- game list -- */
@@ -218,9 +389,10 @@ h2 {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px 8px;
+  padding: 11px 10px;
   border: 0;
   border-bottom: 1px solid var(--line);
+  border-radius: 6px;
   background: none;
   color: var(--text);
   font: inherit;
@@ -233,8 +405,7 @@ h2 {
 }
 
 .game-row:hover {
-  background: var(--surface-2);
-  border-radius: 8px;
+  background: var(--page);
 }
 
 .game-row-date {
@@ -261,7 +432,7 @@ h2 {
 .results-chart {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
+  gap: 2px;
   overflow-x: auto;
   padding: 4px 2px;
 }
@@ -270,38 +441,37 @@ h2 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex: none;
-  width: 18px;
+  width: 20px;
 }
 
 .results-track {
   position: relative;
-  width: 12px;
+  width: 16px;
 }
 
 .results-mid {
   position: absolute;
-  left: -3px;
-  right: -3px;
+  left: -4px;
+  right: -4px;
   height: 1px;
-  background: var(--line);
+  background: var(--axis);
 }
 
 .results-bar {
   position: absolute;
-  left: 0;
-  right: 0;
-  border-radius: 2px;
-  background: var(--muted);
+  left: 1px;
+  right: 1px;
+  border-radius: 4px;
 }
 
 .results-bar.win {
-  background: var(--accent);
+  background: var(--good);
 }
 
 .results-bar.loss {
-  background: var(--danger);
+  background: var(--critical);
 }
 
 .results-bar.draw {
@@ -309,11 +479,12 @@ h2 {
 }
 
 .results-bar.live {
-  background: var(--accent-dim);
+  background: var(--series-1);
 }
 
 .results-tag {
   font-size: 10px;
+  color: var(--muted);
 }
 
 /* ---------------------------------------------------------------- bar cell -- */
@@ -325,10 +496,10 @@ h2 {
 
 .bar span {
   position: absolute;
-  inset: 3px auto 3px 0;
-  background: var(--accent-dim);
-  border-radius: 3px;
-  opacity: 0.55;
+  inset: 4px auto 4px 0;
+  background: var(--series-1);
+  border-radius: 4px;
+  opacity: 0.16;
 }
 
 .bar em {
@@ -341,7 +512,7 @@ h2 {
 .gantt {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .grow-row {
@@ -354,7 +525,7 @@ h2 {
   flex: none;
   width: 88px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -363,8 +534,8 @@ h2 {
 .gtrack {
   position: relative;
   flex: 1;
-  height: 22px;
-  background: var(--surface-2);
+  height: 20px;
+  background: var(--page);
   border-radius: 5px;
   overflow: hidden;
   min-width: 240px;
@@ -376,11 +547,11 @@ h2 {
   display: grid;
   place-items: center;
   min-width: 3px;
-  background: var(--accent-dim);
-  border-radius: 3px;
+  background: var(--series-1);
+  border-radius: 4px;
   font-size: 10px;
   font-weight: 700;
-  color: #d6ffee;
+  color: #fff;
   overflow: hidden;
 }
 
@@ -390,8 +561,9 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
 }
 
 .scorer-row:last-child {

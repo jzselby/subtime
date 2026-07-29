@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { foldGames, teamRecord } from './games';
 import { GameView } from './GameView';
 import { SeasonView } from './SeasonView';
@@ -31,6 +31,17 @@ function useGameId(): [string | null, (id: string | null) => void] {
   return [gameId, navigate];
 }
 
+function Page({ children }: { children: ReactNode }) {
+  return (
+    <div className="page">
+      <div className="topbar">
+        <span className="brand">Touchline · Coaches Dashboard</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function App() {
   const token = useUrlParams().get('t');
   const result = useDashboard(token);
@@ -38,39 +49,39 @@ export function App() {
 
   if (result.status === 'not-configured') {
     return (
-      <div className="page">
+      <Page>
         <div className="empty">
           This dashboard isn't configured — it's missing its Supabase URL/key
           at build time.
         </div>
-      </div>
+      </Page>
     );
   }
   if (result.status === 'no-token') {
     return (
-      <div className="page">
+      <Page>
         <div className="empty">
           This link is missing its token. Ask the coach for the link from
           Team settings → Coaches dashboard.
         </div>
-      </div>
+      </Page>
     );
   }
   if (result.status === 'loading') {
     return (
-      <div className="page">
+      <Page>
         <p className="muted">Loading…</p>
-      </div>
+      </Page>
     );
   }
   if (result.status === 'error') {
     return (
-      <div className="page">
+      <Page>
         <div className="empty">
           Couldn't load this dashboard — the link may be wrong, or the coach
           may have turned it off. ({result.message})
         </div>
-      </div>
+      </Page>
     );
   }
 
@@ -80,7 +91,7 @@ export function App() {
   const selected = gameId ? games.find((g) => g.game.id === gameId) : undefined;
 
   return (
-    <div className="page">
+    <Page>
       {selected ? (
         <GameView summary={selected} players={snapshot.players} onBack={() => setGameId(null)} />
       ) : (
@@ -91,6 +102,6 @@ export function App() {
           onSelectGame={(id) => setGameId(id)}
         />
       )}
-    </div>
+    </Page>
   );
 }
