@@ -65,56 +65,72 @@ export function SeasonView({
         </>
       )}
 
-      <h2>Season stats</h2>
-      {sorted.length === 0 ? (
-        <div className="empty">No games played yet this season.</div>
-      ) : (
-        <div className="card" style={{ overflowX: 'auto' }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th style={{ width: '1%' }}>GP</th>
-                <th style={{ width: '1%' }}>Min</th>
-                <th style={{ width: '1%' }}>G</th>
-                <th style={{ width: '1%' }}>A</th>
-                <th style={{ textAlign: 'left' }}>Positions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((r) => (
-                <tr key={r.playerId}>
-                  <td>
-                    {numberOf.get(r.playerId) && (
-                      <span className="small muted">#{numberOf.get(r.playerId)} </span>
-                    )}
-                    {nameOf.get(r.playerId) ?? r.playerId}
-                  </td>
-                  <td>{r.games}</td>
-                  <td>{mins(r.playedMs)}</td>
-                  <td>{r.goals || ''}</td>
-                  <td>{r.assists || ''}</td>
-                  <td style={{ textAlign: 'left' }}>{byPositionMinutes(r.msByPosition) || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/*
+       * These two panels are the same roster, two views of it (the exact
+       * numbers; a bar to compare them at a glance) — pairing them
+       * side by side once there's room lets a coach cross-reference a row
+       * without scrolling past a second copy of the whole roster first.
+       * Below the `wide-pair` breakpoint they fall back to stacked
+       * full-width sections, same as everything else on the page.
+       */}
+      <div className="wide-pair">
+        <div>
+          <h2>Season stats</h2>
+          {sorted.length === 0 ? (
+            <div className="empty">No games played yet this season.</div>
+          ) : (
+            <div className="card" style={{ overflowX: 'auto' }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th style={{ width: '1%' }}>GP</th>
+                    <th style={{ width: '1%' }}>Min</th>
+                    <th style={{ width: '1%' }}>G</th>
+                    <th style={{ width: '1%' }}>A</th>
+                    <th style={{ textAlign: 'left' }}>Positions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((r) => (
+                    <tr key={r.playerId}>
+                      <td>
+                        {numberOf.get(r.playerId) && (
+                          <span className="small muted">#{numberOf.get(r.playerId)} </span>
+                        )}
+                        {nameOf.get(r.playerId) ?? r.playerId}
+                      </td>
+                      <td>{r.games}</td>
+                      <td>{mins(r.playedMs)}</td>
+                      <td>{r.goals || ''}</td>
+                      <td>{r.assists || ''}</td>
+                      <td style={{ textAlign: 'left' }}>{byPositionMinutes(r.msByPosition) || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
 
-      <h2>Minutes this season</h2>
-      <div className="card">
-        {sorted.map((r) => (
-          <div className="bar-row" key={r.playerId}>
-            <span className="small">{nameOf.get(r.playerId) ?? r.playerId}</span>
-            <span className="bar-track">
-              <span className="bar-fill" style={{ width: `${(r.playedMs / maxMs) * 100}%` }} />
-            </span>
-            <span className="small muted" style={{ textAlign: 'right' }}>
-              {mins(r.playedMs)}m
-            </span>
+        <div>
+          <h2>Minutes this season</h2>
+          <div className="card">
+            {sorted.map((r) => (
+              <div className="bar-row" key={r.playerId}>
+                <span className="small bar-name" title={nameOf.get(r.playerId) ?? r.playerId}>
+                  {nameOf.get(r.playerId) ?? r.playerId}
+                </span>
+                <span className="bar-track">
+                  <span className="bar-fill" style={{ width: `${(r.playedMs / maxMs) * 100}%` }} />
+                </span>
+                <span className="small muted" style={{ textAlign: 'right' }}>
+                  {mins(r.playedMs)}m
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
 
       <h2>Games</h2>
@@ -127,7 +143,9 @@ export function SeasonView({
               <span className="game-row-date">
                 {new Date(g.game.kickoff_at).toLocaleDateString()}
               </span>
-              <span className="game-row-opp">vs {g.game.opponent || 'TBD'}</span>
+              <span className="game-row-opp" title={`vs ${g.game.opponent || 'TBD'}`}>
+                vs {g.game.opponent || 'TBD'}
+              </span>
               <span className="game-row-score">
                 {g.state.score.us}–{g.state.score.them}
               </span>

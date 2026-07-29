@@ -58,6 +58,17 @@ body {
   padding: 0 20px 56px;
 }
 
+/* Past laptop width, 960px starts reading as "the mobile layout, stretched,
+   with margins" rather than a considered desktop surface — the two-column
+   pairing below (season table + minutes bars) needs the room to be worth
+   it. Still well short of full-bleed: a BI table this dense stays easiest
+   to scan around ~1100px of text, not 1440. */
+@media (min-width: 1180px) {
+  .page {
+    max-width: 1100px;
+  }
+}
+
 .muted {
   color: var(--muted);
 }
@@ -90,6 +101,10 @@ h1 {
   font-weight: 700;
   margin: 20px 0 2px;
   letter-spacing: -0.01em;
+  /* A team or opponent name is free text from the app, not copy we control
+     — an unbroken run of characters should wrap inside the page rather
+     than pushing it wider than the viewport. */
+  overflow-wrap: anywhere;
 }
 
 h2 {
@@ -118,6 +133,12 @@ h2 {
   align-items: center;
   gap: 8px;
   margin: 18px 0 24px;
+  /* A flex item's default min-width is its content size, not 0 — without
+     this a native <select> whose longest <option> is a long opponent name
+     refuses to shrink below that text's width, blowing the container (and
+     the whole page) wider than the viewport no matter what max-width says.
+     min-width: 0 lets flex-shrink actually do its job. */
+  min-width: 0;
 }
 
 .scope-select-label {
@@ -129,6 +150,7 @@ h2 {
 
 .scope-select select {
   flex: 1;
+  min-width: 0;
   max-width: 420px;
   font: inherit;
   font-size: 14px;
@@ -137,8 +159,12 @@ h2 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px 12px;
+  /* 11px top/bottom lands this at ~44px tall — a real tap target, not just
+     visually-sized padding, since this is the one control on the page that
+     swaps its entire view. */
+  padding: 11px 12px;
   box-shadow: 0 1px 2px rgba(11, 11, 11, 0.04);
+  text-overflow: ellipsis;
 }
 
 .scope-select select:hover {
@@ -162,7 +188,14 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1 1 110px;
+  /* flex-grow: 0 on purpose — a tile's content is a short label and one
+     short number. Letting tiles grow to fill the row (the previous
+     `flex: 1 1 110px`) reads fine with 3-4 narrow phone-width tiles, but
+     at desktop width it stretches each tile across a hundred-plus idle
+     pixels around a single glyph. Fixed widths that wrap keep every tile
+     the size its content actually needs at every viewport. */
+  flex: 0 1 150px;
+  min-width: 110px;
 }
 
 .stat-label {
@@ -186,6 +219,25 @@ h2 {
 
 .stat-value.critical {
   color: var(--critical);
+}
+
+/* -------------------------------------------------------- wide pairing -- */
+
+/* Stacked (the same as every other section) until there's genuinely enough
+   room for two roster-shaped panels side by side without either one going
+   narrower than it needs to read comfortably. */
+.wide-pair {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 860px) {
+  .wide-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 24px;
+    align-items: start;
+  }
 }
 
 /* ---------------------------------------------------------------- table -- */
@@ -217,6 +269,16 @@ h2 {
 .tbl td:first-child {
   text-align: left;
   white-space: normal;
+  /* A player name is the one cell whose content isn't ours to bound — this
+     lets an unbroken run of characters (no spaces to wrap at) break rather
+     than stretching the table past its card, which would otherwise defeat
+     the card's own overflow-x: auto containment. */
+  overflow-wrap: anywhere;
+  /* Keeps ordinary multi-word names wrapping at their spaces (2-3 sane
+     lines) instead of at arbitrary characters once the column gets tight;
+     a name long enough to still need mid-word breaks at this width is rare
+     enough to fall back on the card's own horizontal scroll. */
+  min-width: 8em;
 }
 
 .tbl tbody tr:last-child td {
@@ -235,6 +297,19 @@ h2 {
   align-items: center;
   gap: 10px;
   padding: 5px 0;
+}
+
+.bar-name {
+  /* A grid track's fixed length (96px) only caps the box — a grid item's
+     own default min-width is its content size, and with overflow: visible
+     a long, unbroken player name renders past that box rather than being
+     held to it, leaking into this card's (unguarded) horizontal overflow
+     and from there into the page. Truncate instead of wrapping so every
+     row in the list stays one line tall, matching .game-row-opp. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bar-track {
@@ -425,6 +500,7 @@ h2 {
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 44px; /* a real tap target on a phone, not just visually-sized padding */
   padding: 11px 10px;
   border: 0;
   border-bottom: 1px solid var(--line);
@@ -452,6 +528,15 @@ h2 {
 
 .game-row-opp {
   font-size: 14px;
+  /* This column is the grid's 1fr track, but grid items default to a
+     content-based min-width just like flex items — without min-width: 0
+     a long, unbroken opponent name refuses to shrink and blows the row
+     (and the page) out past the viewport. Truncate with an ellipsis
+     instead of wrapping so every row in the list stays one line tall. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .game-row-score {
@@ -597,9 +682,15 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
   font-size: 13.5px;
+}
+
+.scorer-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .scorer-row:last-child {

@@ -67,7 +67,7 @@ export function GameView({
       {byMinutes.length === 0 ? (
         <div className="empty">No playing time recorded for this game.</div>
       ) : (
-        <div className="card">
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table className="tbl">
             <tbody>
               {byMinutes.map((s) => (
@@ -136,7 +136,7 @@ export function GameView({
           <div className="card">
             {scorers.map((s) => (
               <div key={s.playerId} className="scorer-row">
-                <span>{nameOf(s.playerId)}</span>
+                <span className="scorer-name">{nameOf(s.playerId)}</span>
                 <span className="small muted">
                   {[s.goals ? `${s.goals}G` : '', s.assists ? `${s.assists}A` : '']
                     .filter(Boolean)
