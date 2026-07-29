@@ -105,8 +105,7 @@ await page.click('text=⚽ Them');
 await page.waitForTimeout(300);
 
 // -- the CSV, before anyone is retired -------------------------------------
-await page.click('[aria-label="More"]');
-await page.click('.sheet >> text=Stats and playing time');
+await page.click('[aria-label="Stats and playing time"]');
 await page.waitForSelector('text=Playing-time fairness');
 await page.click('.actions >> text=Export');
 await page.waitForSelector('text=Export stats');

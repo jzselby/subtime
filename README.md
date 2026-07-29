@@ -87,9 +87,11 @@ can catch at a glance, on the clock's own row rather than a row of its own, so
 it's larger without the bar (or the pitch below it) getting any taller — and
 Pause and hold-to-end at the bottom are sized to this app's own touch-target
 floor rather than bigger than a control tapped a few times a game needs to be.
-Things you touch twice a game — ending a period, jumping to the stats,
-switching to the list — live behind the **•••** menu rather than spending a
-row of height each.
+**Stats and playing time** has its own button in the header, next to **•••**
+— coaches check it often enough mid-game that a menu in between was a real
+cost. Things you touch once or twice a game — ending a period, switching to
+the list, deleting the game — still live behind **•••** rather than each
+spending a row of height.
 
 The clock block is centred on the bar itself, not on whatever space is left
 between the buttons around it. The header has two on the left (back, the

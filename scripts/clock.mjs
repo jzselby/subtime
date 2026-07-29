@@ -106,8 +106,7 @@ check('period label reads 2H', (await page.locator('.gclock .meta').innerText())
 
 // The whole-game total is the honest running figure, and it is the sum of what
 // was actually played rather than of what was scheduled.
-await page.click('[aria-label="More"]');
-await page.click('.sheet >> text=Stats and playing time');
+await page.click('[aria-label="Stats and playing time"]');
 await page.waitForSelector('text=Playing-time fairness');
 const played = (await page.locator('header.top .sub').innerText()).match(/(\d+:\d+) played/);
 console.log(`   total played reads ${played?.[1]}`);

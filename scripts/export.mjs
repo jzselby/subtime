@@ -100,8 +100,7 @@ await page.click('.sheet .chip >> nth=0');
 await page.click('.sheet >> text=No assist');
 await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
 
-await page.click('[aria-label="More"]');
-await page.click('.sheet >> text=Stats and playing time');
+await page.click('[aria-label="Stats and playing time"]');
 await page.waitForSelector('text=Playing-time fairness');
 
 // -- the sheet -------------------------------------------------------------

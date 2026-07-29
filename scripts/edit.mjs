@@ -112,8 +112,7 @@ await page.screenshot({ path: 'scripts/shots/edit-2-corrected.png' });
 // -- the correction must reach the stats -----------------------------------
 await page.click('[aria-label="Back"]');
 await page.waitForSelector('.pitch');
-await page.click('[aria-label="More"]');
-await page.click('.sheet >> text=Stats and playing time');
+await page.click('[aria-label="Stats and playing time"]');
 await page.waitForSelector('text=Playing-time fairness');
 check('goal moved to the right player', (await statsRow(replacement)).goals, '1');
 check('goal removed from the wrong one', (await statsRow(scorer)).goals, '');

@@ -160,8 +160,7 @@ for (const [tag, w, h] of DEVICES) {
   await p.waitForTimeout(500);
   await shot('27-fulltime');
 
-  await p.click('[aria-label="More"]');
-  await p.click('.sheet >> text=Stats and playing time');
+  await p.click('[aria-label="Stats and playing time"]');
   await p.waitForSelector('text=Playing-time fairness');
   await p.waitForTimeout(400);
   await shot('28-summary-top');

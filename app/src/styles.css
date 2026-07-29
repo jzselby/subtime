@@ -1158,6 +1158,17 @@ body.sheet-open .actions {
   background: var(--surface-2);
 }
 
+/* A labelled header button (Stats) rather than a fourth unlabelled glyph
+   next to ‹ ☰ •••: sized to its text instead of the fixed 40px icon
+   square. .gclock is centred against the bar itself, not this group's
+   width, so this doesn't have to stay symmetric with the other side. */
+.gbtn.wide {
+  width: auto;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /*
  * Centered on the bar, not on whatever's left over between two unequal
  * button groups (Back + the event log outweigh the lone ••• on the other

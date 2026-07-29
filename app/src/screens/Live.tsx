@@ -426,6 +426,21 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         </div>
 
         <div className="gbar-side">
+          {/*
+           * Used to live one tap deeper, inside the ••• menu. Coaches check
+           * this mid-game often enough that a menu in between was a real
+           * cost, worth the header's width over adding it to the ••• menu
+           * where it now just duplicates this — text, not a fourth
+           * unlabelled glyph next to ‹ ☰ •••, so what it does is legible at
+           * a glance.
+           */}
+          <button
+            className="gbtn wide"
+            onClick={() => navigate({ name: 'summary', gameId })}
+            aria-label="Stats and playing time"
+          >
+            Stats
+          </button>
           <button className="gbtn" onClick={() => setSheet('menu')} aria-label="More">
             •••
           </button>
@@ -663,12 +678,8 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             >
               {view === 'field' ? 'Show as list' : 'Show the field'}
             </button>
-            <button
-              className="btn block"
-              onClick={() => navigate({ name: 'summary', gameId })}
-            >
-              Stats and playing time
-            </button>
+            {/* Stats and playing time moved to the header — a Stats button
+                sits next to ••• now, so this menu doesn't offer it twice. */}
             <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
               Modify events
             </button>
