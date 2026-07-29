@@ -102,25 +102,50 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
     [log, config, gameId],
   );
 
+  /*
+   * How many of this hook's writes are still in flight — a tab close or
+   * reload while this is above zero can lose one, since the IndexedDB write
+   * is async and nothing else here blocks on it. The effect below is the
+   * guard: it can't stop an OS backgrounding a tab, but it does stop the
+   * ordinary case, a coach tapping the browser's own close/reload while a
+   * write from a second ago hasn't actually landed yet.
+   */
+  const pendingWrites = useRef(0);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (pendingWrites.current <= 0) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
   const recordMany = useCallback(
     async (inputs: EventInput[], wallTs: number = Date.now()) => {
       if (!gameId || inputs.length === 0) return;
-      // Re-fold from storage inside the write so two rapid taps cannot both
-      // stamp the same `seq`.
-      await db.transaction('rw', db.events, async () => {
-        const current = await db.events
-          .where('[gameId+seq]')
-          .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
-          .toArray();
-        const batch: GameEvent[] = [];
-        for (const input of inputs) {
-          // Fold each new event onto the previous one so `seq` and the derived
-          // clock stay correct across the batch.
-          const { state } = reduce([...current, ...batch], config, gameId);
-          batch.push(appendEvent(state, input, wallTs));
-        }
-        await db.events.bulkAdd(batch);
-      });
+      pendingWrites.current += 1;
+      try {
+        // Re-fold from storage inside the write so two rapid taps cannot both
+        // stamp the same `seq`.
+        await db.transaction('rw', db.events, async () => {
+          const current = await db.events
+            .where('[gameId+seq]')
+            .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
+            .toArray();
+          const batch: GameEvent[] = [];
+          for (const input of inputs) {
+            // Fold each new event onto the previous one so `seq` and the derived
+            // clock stay correct across the batch.
+            const { state } = reduce([...current, ...batch], config, gameId);
+            batch.push(appendEvent(state, input, wallTs));
+          }
+          await db.events.bulkAdd(batch);
+        });
+      } finally {
+        pendingWrites.current -= 1;
+      }
     },
     [gameId, config],
   );
@@ -132,13 +157,18 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
 
   const undo = useCallback(async () => {
     if (!gameId) return;
-    await db.transaction('rw', db.events, async () => {
-      const last = await db.events
-        .where('[gameId+seq]')
-        .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
-        .last();
-      if (last) await db.events.delete(last.id);
-    });
+    pendingWrites.current += 1;
+    try {
+      await db.transaction('rw', db.events, async () => {
+        const last = await db.events
+          .where('[gameId+seq]')
+          .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
+          .last();
+        if (last) await db.events.delete(last.id);
+      });
+    } finally {
+      pendingWrites.current -= 1;
+    }
   }, [gameId]);
 
   return { ...folded, events: log, loading, record, recordMany, undo };

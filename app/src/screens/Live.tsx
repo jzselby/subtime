@@ -274,8 +274,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     if (dragged.current) return;
     if (pickedOff.size === 1) {
       const playerId = [...pickedOff][0] as string;
-      void record({ type: 'POSITION_CHANGE', playerId, to: slotCode });
-      setPickedOff(new Set());
+      void record({ type: 'POSITION_CHANGE', playerId, to: slotCode }).then(() =>
+        setPickedOff(new Set()),
+      );
       return;
     }
     setFillingSlot(slotId);
@@ -645,8 +646,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
               <HoldButton
                 className="btn warn block"
                 onHold={() => {
-                  setSheet(null);
-                  void record({ type: 'PERIOD_END' });
+                  void record({ type: 'PERIOD_END' }).then(() => setSheet(null));
                 }}
               >
                 Hold to end {periodLabel} (or ■ in the bar)
@@ -726,8 +726,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                       type: 'SUB',
                       off: [],
                       on: [{ playerId: row.playerId, position: code }],
-                    });
-                    setFillingSlot(null);
+                    }).then(() => setFillingSlot(null));
                   }}
                 >
                   {p?.number && <b>{p.number}</b>} {p?.name ?? row.playerId}
@@ -745,8 +744,10 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           nameOf={nameOf}
           onClose={() => setSheet(null)}
           onSubmit={(scorerId, assistId) => {
-            void record({ type: 'GOAL', scorerId, assistId });
-            setSheet(null);
+            // Closed only once the write lands, not the instant it's fired —
+            // a closed sheet reads as "done," and that's exactly the moment
+            // a coach might background the tab.
+            void record({ type: 'GOAL', scorerId, assistId }).then(() => setSheet(null));
           }}
         />
       )}
@@ -788,15 +789,14 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                     ([id, code]) => code === position && id !== movingPlayer,
                   )?.[0];
                   const mine = state.onField.get(movingPlayer);
-                  if (sitting && mine) {
-                    void recordMany([
-                      { type: 'POSITION_CHANGE', playerId: movingPlayer, to: position },
-                      { type: 'POSITION_CHANGE', playerId: sitting, to: mine },
-                    ]);
-                  } else {
-                    void record({ type: 'POSITION_CHANGE', playerId: movingPlayer, to: position });
-                  }
-                  setMovingPlayer(null);
+                  const written =
+                    sitting && mine
+                      ? recordMany([
+                          { type: 'POSITION_CHANGE', playerId: movingPlayer, to: position },
+                          { type: 'POSITION_CHANGE', playerId: sitting, to: mine },
+                        ])
+                      : record({ type: 'POSITION_CHANGE', playerId: movingPlayer, to: position });
+                  void written.then(() => setMovingPlayer(null));
                 }}
               >
                 {position}

@@ -217,9 +217,10 @@ begin
     status = excluded.status,
     updated_at = now();
 
-  -- Events are immutable once recorded, so this is insert-only: a
-  -- conflicting id is the same event arriving twice (retry after a dropped
-  -- response), never a real edit to reconcile.
+  -- Events are *not* immutable in the app — "Modify events" (Events.tsx)
+  -- lets a coach correct a mis-recorded scorer/assist/card in place (same
+  -- id, changed payload) or delete one outright — so a conflicting id here
+  -- is a real edit to reconcile, not just the same event arriving twice.
   insert into game_events (id, game_id, seq, payload)
   select
     e->>'id',
@@ -228,7 +229,38 @@ begin
     e->'payload'
   from jsonb_array_elements(coalesce(data->'events', '[]'::jsonb)) as e
   where e->>'game_id' in (select id from games where team_id = p_team_id)
-  on conflict (id) do nothing;
+  on conflict (id) do update set
+    seq = excluded.seq,
+    payload = excluded.payload;
+
+  -- Deletions have no id to conflict on, so they need their own pass: a
+  -- full `publishNow()` always sends the *complete* current event log for
+  -- every one of this team's games (see collectPayload in app/src/sync.ts),
+  -- so anything stored here under one of this team's games that isn't in
+  -- that batch was removed locally and should be removed here too. This
+  -- assumption breaks if an incremental/queued publish is ever added that
+  -- only sends new or changed events — that path would need to carry its
+  -- own deleted-ids list rather than relying on absence.
+  --
+  -- Gated on `data ? 'events'` — key *presence*, not the coalesced value —
+  -- because disableDashboard() calls this function with a `data` that omits
+  -- `events`/`players`/`games` entirely (just `{"team": {"dashboard_enabled":
+  -- false}}`). Without this guard, coalescing that absent key to `[]` reads
+  -- as "the local event log for every game is now empty" and this would
+  -- delete every event for the team on every single toggle-off.
+  if data ? 'events' then
+    -- `not exists` rather than `not in`: a bare `not in (select ...)` goes
+    -- false for every row — silently deleting nothing — the instant any
+    -- element of that subquery is null, which a malformed payload could
+    -- trigger. `not exists` has no such trap.
+    delete from game_events ge
+    where ge.game_id in (select id from games where team_id = p_team_id)
+      and not exists (
+        select 1
+        from jsonb_array_elements(data->'events') as e
+        where e->>'id' = ge.id
+      );
+  end if;
 end;
 $$;
 
