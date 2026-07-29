@@ -665,9 +665,14 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 className="btn danger block"
                 onHold={() => {
                   setSheet(null);
-                  void record({ type: 'GAME_END' }).then(() =>
-                    navigate({ name: 'summary', gameId }),
-                  );
+                  // Persisted directly here, not left to the status-sync effect
+                  // above: that effect needs a render after `state` re-derives
+                  // before it can write anything, and the navigate below can
+                  // unmount this screen before that render happens — losing the
+                  // write and leaving `status` stuck at 'live'.
+                  void record({ type: 'GAME_END' })
+                    .then(() => db.games.update(gameId, { status: 'final' }))
+                    .then(() => navigate({ name: 'summary', gameId }));
                 }}
               >
                 Hold to end the game

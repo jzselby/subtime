@@ -410,7 +410,12 @@ ${rows}
                 className="btn danger block"
                 onHold={() => {
                   setMenu(false);
-                  void record({ type: 'GAME_END' });
+                  // Unlike Live.tsx, this screen has no effect anywhere that
+                  // syncs `game.status` to the derived state, so it has to be
+                  // persisted directly here or it never happens at all.
+                  void record({ type: 'GAME_END' }).then(() =>
+                    db.games.update(gameId, { status: 'final' }),
+                  );
                 }}
               >
                 Hold to end the game

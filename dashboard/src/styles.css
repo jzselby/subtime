@@ -1,10 +1,13 @@
 :root {
   --bg: #0f1720;
   --surface: #172230;
+  --surface-2: #1f2d3d;
   --line: #2b3a4d;
   --text: #e8f0f5;
   --muted: #8ba0b5;
   --accent: #38bd8a;
+  --accent-dim: #1f6b52;
+  --danger: #e5484d;
 }
 
 * {
@@ -110,4 +113,287 @@ h2 {
   color: var(--muted);
   border: 1px dashed var(--line);
   border-radius: 12px;
+}
+
+/* -------------------------------------------------------------- back link -- */
+
+.link-back {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.link-back:hover {
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------- banner -- */
+
+.banner {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  font-size: 13px;
+}
+
+.banner.ok {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-color: var(--accent-dim);
+}
+
+/* ------------------------------------------------------------ result chip -- */
+
+.result-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.result-chip.w {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  color: var(--accent);
+}
+
+.result-chip.l {
+  background: color-mix(in srgb, var(--danger) 20%, var(--surface));
+  color: #ff8f92;
+}
+
+.result-chip.d {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.result-chip.live {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+}
+
+/* -------------------------------------------------------------- record -- */
+
+.record-card {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.record-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.record-num {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- game list -- */
+
+.game-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.game-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-row:last-child {
+  border-bottom: 0;
+}
+
+.game-row:hover {
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+
+.game-row-date {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.game-row-opp {
+  font-size: 14px;
+}
+
+.game-row-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.game-row-arrow {
+  color: var(--muted);
+}
+
+/* ----------------------------------------------------------- results chart -- */
+
+.results-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px;
+}
+
+.results-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  width: 18px;
+}
+
+.results-track {
+  position: relative;
+  width: 12px;
+}
+
+.results-mid {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  height: 1px;
+  background: var(--line);
+}
+
+.results-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 2px;
+  background: var(--muted);
+}
+
+.results-bar.win {
+  background: var(--accent);
+}
+
+.results-bar.loss {
+  background: var(--danger);
+}
+
+.results-bar.draw {
+  background: var(--muted);
+}
+
+.results-bar.live {
+  background: var(--accent-dim);
+}
+
+.results-tag {
+  font-size: 10px;
+}
+
+/* ---------------------------------------------------------------- bar cell -- */
+
+.bar {
+  position: relative;
+  min-width: 74px;
+}
+
+.bar span {
+  position: absolute;
+  inset: 3px auto 3px 0;
+  background: var(--accent-dim);
+  border-radius: 3px;
+  opacity: 0.55;
+}
+
+.bar em {
+  position: relative;
+  font-style: normal;
+}
+
+/* ---------------------------------------------------------------- gantt -- */
+
+.gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.grow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.glabel {
+  flex: none;
+  width: 88px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gtrack {
+  position: relative;
+  flex: 1;
+  height: 22px;
+  background: var(--surface-2);
+  border-radius: 5px;
+  overflow: hidden;
+  min-width: 240px;
+}
+
+.gseg {
+  position: absolute;
+  inset: 2px auto 2px 0;
+  display: grid;
+  place-items: center;
+  min-width: 3px;
+  background: var(--accent-dim);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #d6ffee;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------- scorers -- */
+
+.scorer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.scorer-row:last-child {
+  border-bottom: 0;
 }

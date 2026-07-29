@@ -40,6 +40,27 @@ this case.
 - `src/season.ts` — `seasonStats()`: groups events by game, folds each with
   `reduce()` + `playerStats()`, sums with `aggregatePlayerStats()`. Exactly
   `Season.tsx`'s fold, reused rather than reimplemented.
+- `src/games.ts` — `foldGames()`: the same per-game fold, kept separate from
+  `season.ts` because the season leaderboard and the game-by-game views need
+  different shapes out of it (a `GameState` and a W/L/D per game here, a
+  summed `PlayerSeasonStats` row there). Also `teamRecord()` (W-L-D, goals
+  for/against) and `periodOffsets()`, shared with `GameView.tsx`'s timeline.
 - `src/useDashboard.ts` — reads the token from the URL, loads and polls.
-- `src/App.tsx` — season leaderboard, a minutes bar chart, and a per-game
-  fairness list. Hand-rolled SVG/CSS, no charting dependency yet.
+- `src/App.tsx` — routing only: which game (if any) is selected, kept in
+  `?g=` so a drill-down is a shareable, back-button-able URL, no router
+  dependency needed for two screens.
+- `src/SeasonView.tsx` — team record card, a results chart (goal
+  differential per game), the season leaderboard, a minutes bar chart, and a
+  clickable games list. No fairness here — see below.
+- `src/GameView.tsx` — one game's detail, opened by tapping a row in the
+  games list: score, fairness (moved here from the season page, since it's
+  a per-game question, not a season one), playing time, a "who was on,
+  when" timeline, and goals/assists. Mirrors `Summary.tsx`'s layout in the
+  main app.
+- `src/ResultsChart.tsx` — the diverging goal-differential bar chart on the
+  season page.
+- `src/format.ts` — the small formatting helpers (`mins`, `mmss`,
+  position-summary strings) shared across the views.
+
+Charts are hand-rolled SVG/CSS throughout, same as `Summary.tsx`'s bars and
+gantt in the main app — no charting dependency yet.
