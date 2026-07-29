@@ -22,6 +22,14 @@ export default defineConfig({
       workbox: {
         // The whole app is precached, so a game can be run with no signal at all.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Without this, the service worker treats any navigation inside its
+        // scope it doesn't recognize as an SPA route and serves the app's
+        // own cached shell for it — including /dashboard/, a completely
+        // separate site nested one level below wherever this app is
+        // deployed. A coach who'd ever opened the app, then tapped a
+        // dashboard share link, got the app's shell (wrong JS, wrong
+        // relative asset paths, a blank page) instead of the dashboard.
+        navigateFallbackDenylist: [/\/dashboard\//],
       },
       manifest: {
         name: 'Touchline',
