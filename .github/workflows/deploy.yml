@@ -29,7 +29,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # app first, so its PWA service-worker precache manifest (built from
+      # app/dist's contents at build time) doesn't pick up dashboard/'s
+      # files — they're copied in below, after this build finishes.
       - run: npm run build
+      - run: npm run build:dashboard
+      - run: cp -r dashboard/dist app/dist/dashboard
       # Turning Pages on for the first time is a one-time manual step:
       # Settings → Pages → Source: GitHub Actions. It cannot be automated here.
       # `enablement: true` looks like it would do it, but creating a Pages site
