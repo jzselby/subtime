@@ -244,6 +244,23 @@ await page.waitForTimeout(300);
 // it used to share with the period label, and readable at a glance.
 check('score reads 1–1', (await page.locator('.gscore').innerText()).trim(), '1–1');
 
+// The header has two buttons on the left (Back, the event log) and one on
+// the right (•••), so centering the clock block the ordinary flex way — one
+// box squeezed between two unequal groups — put it visibly off to one side.
+// It's absolutely positioned against the bar itself now, not the leftover
+// space, specifically so it can't drift with however many buttons end up on
+// either side.
+const clockCenter = await page.locator('.gclock').evaluate((el) => {
+  const r = el.getBoundingClientRect();
+  return (r.left + r.right) / 2;
+});
+const windowWidth = await page.evaluate(() => window.innerWidth);
+check(
+  'the clock and score are centred on the bar, not the leftover space beside it',
+  Math.abs(clockCenter - windowWidth / 2) < 2,
+  true,
+);
+
 // -- stoppage: the clock must freeze --------------------------------------
 await page.click('[aria-label="Pause clock"]');
 await page.waitForTimeout(200);

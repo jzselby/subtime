@@ -1121,14 +1121,23 @@ body.sheet-open .actions {
  */
 
 .gamebar {
+  position: relative; /* anchors .gclock's absolute centering below */
   flex: none;
   z-index: 20;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
   padding: calc(env(safe-area-inset-top) + 6px) 8px 6px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
+}
+
+.gbar-side {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
 }
 
 .gbtn {
@@ -1149,18 +1158,30 @@ body.sheet-open .actions {
   background: var(--surface-2);
 }
 
+/*
+ * Centered on the bar, not on whatever's left over between two unequal
+ * button groups (Back + the event log outweigh the lone ••• on the other
+ * side) — see the comment beside this element in Live.tsx. Not part of the
+ * flex flow at all, so it can't be nudged off-centre by a future button
+ * added to either side; pointer-events is off because nothing in here is
+ * ever meant to be tapped, so it can never sit in front of one that is.
+ */
 .gclock {
-  flex: 1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: grid;
   justify-items: center;
-  gap: 1px;
+  gap: 3px;
   min-width: 0;
+  pointer-events: none;
 }
 
 .gtoprow {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
 }
 

@@ -381,17 +381,28 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       {/* Clock and score live in one thin strip; transport moved to the bottom
           bar, in the thumb's reach, rather than sharing this row with it. */}
       <header className="gamebar">
-        <button
-          className="gbtn"
-          onClick={() => navigate({ name: 'team', teamId: game.teamId })}
-          aria-label="Back"
-        >
-          ‹
-        </button>
-        <button className="gbtn" onClick={() => setSheet('log')} aria-label="Event log">
-          ☰
-        </button>
+        <div className="gbar-side">
+          <button
+            className="gbtn"
+            onClick={() => navigate({ name: 'team', teamId: game.teamId })}
+            aria-label="Back"
+          >
+            ‹
+          </button>
+          <button className="gbtn" onClick={() => setSheet('log')} aria-label="Event log">
+            ☰
+          </button>
+        </div>
 
+        {/*
+         * Absolutely positioned and centered on the bar itself, not just
+         * within whatever space the side buttons leave behind. Two buttons
+         * sit on the left (Back, the event log) and one on the right (•••),
+         * so centering this the ordinary flex-item way — one flex-auto box
+         * squeezed between two unequal groups — put it visibly off-centre,
+         * shifted toward the lighter side. This can't drift with however
+         * many buttons end up on either side.
+         */}
         <div className="gclock">
           {/* Score sits beside the clock rather than folded into the small
               meta line beneath it — same row, so the bar's height (and with
@@ -414,9 +425,11 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           </span>
         </div>
 
-        <button className="gbtn" onClick={() => setSheet('menu')} aria-label="More">
-          •••
-        </button>
+        <div className="gbar-side">
+          <button className="gbtn" onClick={() => setSheet('menu')} aria-label="More">
+            •••
+          </button>
+        </div>
       </header>
 
       {errors.length > 0 && (

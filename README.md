@@ -91,6 +91,13 @@ Things you touch twice a game — ending a period, jumping to the stats,
 switching to the list — live behind the **•••** menu rather than spending a
 row of height each.
 
+The clock block is centred on the bar itself, not on whatever space is left
+between the buttons around it. The header has two on the left (back, the
+event log) and one on the right (•••), so centring it the ordinary way — one
+box squeezed between two unequal groups — put it visibly off to one side; it's
+positioned independently of them instead, so it can't drift off-centre if a
+button is ever added or moved.
+
 Every shirt shows number, name, and minutes played. (On a small phone the pitch
 drops the name and keeps number and minutes — three lines of label per player is
 what makes rows collide.) The formation is captioned top-left. A player with no
@@ -270,6 +277,14 @@ check reads both buttons' real heights and requires both at the app's own
 touch-target floor, which is what actually catches that: verified with teeth
 by reverting only the hold-to-end button's height back up, which failed
 both checks exactly as that mechanism predicts.
+
+And the clock block's centring: it measures `.gclock`'s midpoint against the
+window's actual midpoint and requires them within 2px. Centring it the
+ordinary flex way — one box between two unequal button groups — passes any
+check that doesn't measure against the real screen centre, since the box
+*is* centred, just within leftover space that isn't itself centred. Verified
+with teeth: reverting to that layout shifted the block visibly and failed
+the check by roughly 20px, exactly the width one extra header button adds.
 
 `scripts/resume.mjs` covers the failure mode that matters most on a sideline:
 it starts a game, closes the tab entirely, waits, and reopens. Game time must
