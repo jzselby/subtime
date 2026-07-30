@@ -602,7 +602,16 @@ body.sheet-open .actions {
 .sheet {
   width: 100%;
   max-width: 720px;
-  max-height: 86vh;
+  /* Capped at 86% of the viewport normally, same as always — but also never
+     taller than `.sheet-backdrop`'s own box, which shrinks to the keyboard-
+     safe height (see useKeyboardSafeHeight). Without the second bound, a
+     sheet with enough content to hit 86vh could still render taller than
+     what's actually visible once the keyboard is up: the backdrop is
+     bottom-anchored, so the sheet's *top* — its title bar, and whatever
+     input the keyboard is even open for — got pushed off the top of the
+     screen with no way to scroll back up to it, only the sheet's own
+     overflow scrolling *within* a box that was itself partly off-screen. */
+  max-height: min(86vh, 100%);
   overflow-y: auto;
   padding: var(--pad) var(--pad) calc(env(safe-area-inset-bottom) + var(--pad));
   background: var(--surface);
