@@ -17,7 +17,10 @@ export function SeasonView({
   record: TeamRecord;
   onSelectGame: (gameId: string) => void;
 }) {
-  const { rows } = seasonStats(snapshot);
+  const { rows } = seasonStats(
+    games.map((g) => g.game),
+    snapshot.events,
+  );
   const byGoals = [...rows].sort(
     (a, b) => b.goals - a.goals || b.assists - a.assists || b.playedMs - a.playedMs,
   );

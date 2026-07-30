@@ -6,13 +6,16 @@ import {
   createGame,
   db,
   deleteTeam,
+  GAME_TAG_LABELS,
   playerHistory,
   removePlayer,
   restorePlayer,
   uid,
+  type GameTag,
   type Player,
   type Team,
 } from '../db';
+import { LogPastGameSheet } from './LogPastGame';
 import { navigate } from '../router';
 import { dashboardConfigured, dashboardUrl, disableDashboard, enableDashboard, publishNow } from '../sync';
 
@@ -27,7 +30,7 @@ export function TeamScreen({ teamId }: { teamId: string }) {
     [teamId],
   );
 
-  const [sheet, setSheet] = useState<'player' | 'game' | 'settings' | null>(null);
+  const [sheet, setSheet] = useState<'player' | 'game' | 'pastGame' | 'settings' | null>(null);
   const [editing, setEditing] = useState<Player | null>(null);
 
   if (!team) return <Screen title="Loading…">{null}</Screen>;
@@ -117,6 +120,13 @@ export function TeamScreen({ teamId }: { teamId: string }) {
       >
         + New game
       </button>
+      <button
+        className="btn block"
+        disabled={roster.length === 0}
+        onClick={() => setSheet('pastGame')}
+      >
+        Log a past game
+      </button>
       {roster.length === 0 && (
         <p className="small muted center">Add players before creating a game.</p>
       )}
@@ -176,6 +186,9 @@ export function TeamScreen({ teamId }: { teamId: string }) {
         <AddPlayerSheet teamId={teamId} onClose={() => setSheet(null)} />
       )}
       {sheet === 'game' && <NewGameSheet team={team} onClose={() => setSheet(null)} />}
+      {sheet === 'pastGame' && (
+        <LogPastGameSheet team={team} roster={roster} onClose={() => setSheet(null)} />
+      )}
       {sheet === 'settings' && <SettingsSheet team={team} onClose={() => setSheet(null)} />}
       {editing && <EditPlayerSheet player={editing} onClose={() => setEditing(null)} />}
     </Screen>
@@ -334,10 +347,11 @@ function AddPlayerSheet({ teamId, onClose }: { teamId: string; onClose: () => vo
 function NewGameSheet({ team, onClose }: { team: Team; onClose: () => void }) {
   const [opponent, setOpponent] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [tag, setTag] = useState<GameTag | ''>('');
 
   const submit = async () => {
     const kickoffAt = new Date(`${date}T12:00:00`).getTime() || Date.now();
-    const id = await createGame(team, opponent.trim(), kickoffAt);
+    const id = await createGame(team, opponent.trim(), kickoffAt, tag || undefined);
     onClose();
     navigate({ name: 'setup', gameId: id });
   };
@@ -355,10 +369,23 @@ function NewGameSheet({ team, onClose }: { team: Team; onClose: () => void }) {
             onKeyDown={(e) => e.key === 'Enter' && void submit()}
           />
         </label>
-        <label className="field">
-          <span>Date</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
+        <div className="row">
+          <label className="field grow">
+            <span>Date</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <label className="field grow">
+            <span>Tag</span>
+            <select value={tag} onChange={(e) => setTag(e.target.value as GameTag | '')}>
+              <option value="">None</option>
+              {Object.entries(GAME_TAG_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <p className="small muted">
           Uses this team's format: {team.config.periods.count} ×{' '}
           {Math.round(team.config.periods.lengthMs / 60_000)} min,{' '}

@@ -44,6 +44,10 @@ create table games (
   config jsonb not null,
   formation jsonb not null,
   status text not null,
+  -- 'fall' | 'spring' | 'tournament' | 'scrimmage', or null for untagged.
+  -- Not an enum: app/src/db.ts's GameTag is the source of truth for the
+  -- fixed set, and a text column needs no migration if that set ever grows.
+  tag text,
   updated_at timestamptz not null default now()
 );
 
@@ -130,7 +134,7 @@ grant execute on function get_team_dashboard(uuid) to anon;
 --                  "dashboard_enabled": ... },   -- the on/off toggle itself
 --     "players": [{ "id": ..., "name": ..., "number": ..., "active": ... }, ...],
 --     "games":   [{ "id": ..., "opponent": ..., "kickoff_at": ..., "config": ...,
---                   "formation": ..., "status": ... }, ...],
+--                   "formation": ..., "status": ..., "tag": ... }, ...],
 --     "events":  [{ "id": ..., "game_id": ..., "seq": ..., "payload": ... }, ...]
 --   }
 --
@@ -198,7 +202,7 @@ begin
     number = excluded.number,
     active = excluded.active;
 
-  insert into games (id, team_id, opponent, kickoff_at, config, formation, status, updated_at)
+  insert into games (id, team_id, opponent, kickoff_at, config, formation, status, tag, updated_at)
   select
     g->>'id',
     p_team_id,
@@ -207,6 +211,7 @@ begin
     g->'config',
     g->'formation',
     g->>'status',
+    g->>'tag',
     now()
   from jsonb_array_elements(coalesce(data->'games', '[]'::jsonb)) as g
   on conflict (id) do update set
@@ -214,6 +219,7 @@ begin
     kickoff_at = excluded.kickoff_at,
     config = excluded.config,
     formation = excluded.formation,
+    tag = excluded.tag,
     status = excluded.status,
     updated_at = now();
 

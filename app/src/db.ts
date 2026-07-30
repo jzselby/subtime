@@ -1,5 +1,5 @@
-import type { GameConfig, GameEvent } from '@pitchside/core';
-import { appearsInLog, defaultConfig, reduce } from '@pitchside/core';
+import type { EventInput, GameConfig, GameEvent } from '@pitchside/core';
+import { appearsInLog, appendEvent, defaultConfig, reduce } from '@pitchside/core';
 import Dexie, { type EntityTable } from 'dexie';
 import type { Formation } from './formations';
 import { defaultFormation } from './formations';
@@ -50,6 +50,18 @@ export interface Player {
   active: number; // 0/1 — Dexie cannot index booleans
 }
 
+/** Fixed on purpose — see the dashboard's tag filter, which lists exactly these. */
+export type GameTag = 'fall' | 'spring' | 'tournament' | 'scrimmage';
+
+/** Shared everywhere a game's tag is picked, so the four options and their
+ *  labels stay in exactly one place. */
+export const GAME_TAG_LABELS: Record<GameTag, string> = {
+  fall: 'Fall season',
+  spring: 'Spring season',
+  tournament: 'Tournament',
+  scrimmage: 'Scrimmage',
+};
+
 export interface Game {
   id: string;
   teamId: string;
@@ -60,6 +72,8 @@ export interface Game {
   formation: Formation;
   status: 'setup' | 'live' | 'final';
   createdAt: number;
+  /** Optional; unset for anything logged before this existed. */
+  tag?: GameTag;
 }
 
 /**
@@ -234,7 +248,12 @@ export async function createTeam(
   return id;
 }
 
-export async function createGame(team: Team, opponent: string, kickoffAt: number): Promise<string> {
+export async function createGame(
+  team: Team,
+  opponent: string,
+  kickoffAt: number,
+  tag?: GameTag,
+): Promise<string> {
   const id = uid();
   await db.games.add({
     id,
@@ -247,6 +266,53 @@ export async function createGame(team: Team, opponent: string, kickoffAt: number
     formation: structuredClone(team.formation),
     status: 'setup',
     createdAt: Date.now(),
+    ...(tag ? { tag } : {}),
+  });
+  return id;
+}
+
+/**
+ * Record a game after the fact — one that was never run through this app live,
+ * so there is no lineup, no clock, and no real playing time to derive. Skips
+ * straight to a 'final' game with whatever the coach actually remembers: who
+ * was there, the final score, and who scored or assisted.
+ *
+ * `inputs` is built by the caller (see `LogPastGame.tsx`) as a flat list of
+ * `ATTENDANCE` / `GOAL` / `OPPONENT_GOAL` events, always ending in `GAME_END`.
+ * Folded one at a time — same pattern as `recordMany` in hooks.ts — so `seq`
+ * and each event's derived clock position stay correct across the batch, even
+ * though every one of these is stamped at the same nominal wall time.
+ */
+export async function logPastGame(
+  team: Team,
+  opponent: string,
+  kickoffAt: number,
+  tag: GameTag | undefined,
+  inputs: EventInput[],
+): Promise<string> {
+  const id = uid();
+  const config = structuredClone(team.config);
+  const batch: GameEvent[] = [];
+  for (let i = 0; i < inputs.length; i++) {
+    const { state } = reduce(batch, config, id);
+    // Distinct, increasing wallTs per event — there's no real timeline to
+    // stamp these against, but events sharing one instant would make the
+    // audit trail in "Modify events" unreadable (every row the same time).
+    batch.push(appendEvent(state, inputs[i] as EventInput, kickoffAt + i));
+  }
+  await db.transaction('rw', db.games, db.events, async () => {
+    await db.games.add({
+      id,
+      teamId: team.id,
+      opponent,
+      kickoffAt,
+      config,
+      formation: structuredClone(team.formation),
+      status: 'final',
+      createdAt: Date.now(),
+      ...(tag ? { tag } : {}),
+    });
+    await db.events.bulkAdd(batch);
   });
   return id;
 }

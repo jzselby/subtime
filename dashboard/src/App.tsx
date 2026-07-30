@@ -32,6 +32,37 @@ function useGameId(): [string | null, (id: string | null) => void] {
   return [gameId, navigate];
 }
 
+const TAG_LABELS: Record<string, string> = {
+  fall: 'Fall season',
+  spring: 'Spring season',
+  tournament: 'Tournament',
+  scrimmage: 'Scrimmage',
+};
+
+/** Same dropdown-at-the-top shape as ScopeSelect, sitting above it — narrows
+ *  which games ScopeSelect and the season view even see. */
+function TagFilter({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (tag: string | null) => void;
+}) {
+  return (
+    <label className="scope-select">
+      <span className="scope-select-label">Filter</span>
+      <select value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+        <option value="">All games</option>
+        {Object.entries(TAG_LABELS).map(([tag, label]) => (
+          <option key={tag} value={tag}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Page({ children }: { children: ReactNode }) {
   return (
     <div className="page">
@@ -47,6 +78,7 @@ export function App() {
   const token = useUrlParams().get('t');
   const result = useDashboard(token);
   const [gameId, setGameId] = useGameId();
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   if (result.status === 'not-configured') {
     return (
@@ -89,7 +121,10 @@ export function App() {
   const { snapshot } = result;
   const { team } = snapshot;
   const games = foldGames(snapshot);
-  const record = teamRecord(games);
+  const filteredGames = tagFilter ? games.filter((g) => g.game.tag === tagFilter) : games;
+  const record = teamRecord(filteredGames);
+  // Looked up against the full list, not the filtered one, so a direct link
+  // to a specific game still opens it even if a filter is active.
   const selected = gameId ? games.find((g) => g.game.id === gameId) : undefined;
 
   return (
@@ -97,15 +132,26 @@ export function App() {
       <h1>{team.name}</h1>
       <p className="muted">
         {team.age_group ? `${team.age_group} · ` : ''}
-        {games.length} game{games.length === 1 ? '' : 's'} this season
+        {filteredGames.length} game{filteredGames.length === 1 ? '' : 's'}
+        {tagFilter ? '' : ' this season'}
       </p>
-      <ScopeSelect games={games} value={gameId} onChange={setGameId} />
+      <TagFilter
+        value={tagFilter}
+        onChange={(tag) => {
+          setTagFilter(tag);
+          // A filter change can leave the currently open game out of view —
+          // back out to the (now filtered) season list rather than showing a
+          // game that no longer matches what's selected above it.
+          setGameId(null);
+        }}
+      />
+      <ScopeSelect games={filteredGames} value={gameId} onChange={setGameId} />
       {selected ? (
         <GameView summary={selected} players={snapshot.players} onBack={() => setGameId(null)} />
       ) : (
         <SeasonView
           snapshot={snapshot}
-          games={games}
+          games={filteredGames}
           record={record}
           onSelectGame={(id) => setGameId(id)}
         />

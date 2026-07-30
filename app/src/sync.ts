@@ -62,6 +62,7 @@ async function collectPayload(teamId: string) {
       config: g.config,
       formation: g.formation,
       status: g.status,
+      tag: g.tag ?? null,
     })),
     events: eventsByGame.flat().map((e) => ({
       id: e.id,

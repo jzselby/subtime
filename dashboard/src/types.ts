@@ -27,6 +27,8 @@ export interface DashboardGame {
   config: GameConfig;
   formation: unknown;
   status: 'setup' | 'live' | 'final';
+  /** 'fall' | 'spring' | 'tournament' | 'scrimmage' | null — see app/src/db.ts's GameTag. */
+  tag: string | null;
 }
 
 export interface DashboardEvent {

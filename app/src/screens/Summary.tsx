@@ -2,7 +2,7 @@ import { elapsedGameMs, fairnessIndex, formatClock, playerStats } from '@pitchsi
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 import { HoldButton, mins, mmss, Screen, Sheet } from '../components';
-import { db, deleteGame, type Game } from '../db';
+import { db, deleteGame, GAME_TAG_LABELS, type Game, type GameTag } from '../db';
 import { useGameLog, useNow } from '../hooks';
 import { navigate } from '../router';
 
@@ -563,9 +563,10 @@ ${rows}
 
 function EditGameSheet({ game, onClose }: { game: Game; onClose: () => void }) {
   const [opponent, setOpponent] = useState(game.opponent);
+  const [tag, setTag] = useState<GameTag | ''>(game.tag ?? '');
 
   const save = async () => {
-    await db.games.update(game.id, { opponent: opponent.trim() });
+    await db.games.update(game.id, { opponent: opponent.trim(), tag: tag || undefined });
     onClose();
   };
 
@@ -581,6 +582,17 @@ function EditGameSheet({ game, onClose }: { game: Game; onClose: () => void }) {
             placeholder="Rovers"
             onKeyDown={(e) => e.key === 'Enter' && void save()}
           />
+        </label>
+        <label className="field">
+          <span>Tag</span>
+          <select value={tag} onChange={(e) => setTag(e.target.value as GameTag | '')}>
+            <option value="">None</option>
+            {Object.entries(GAME_TAG_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </label>
         <button className="btn primary block" onClick={() => void save()}>
           Save

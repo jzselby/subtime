@@ -2,7 +2,7 @@ import type { PlayerSlot } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { initials, minutesOf, Screen, Sheet } from '../components';
-import { db, deleteGame, type Game, type Player } from '../db';
+import { db, deleteGame, GAME_TAG_LABELS, type Game, type GameTag, type Player } from '../db';
 import { useGameLog } from '../hooks';
 import type { Occupant } from '../Pitch';
 import { Pitch } from '../Pitch';
@@ -381,10 +381,12 @@ function MatchSettings({
   const [periods, setPeriods] = useState(game.config.periods.count);
   const [lengthMin, setLengthMin] = useState(String(Math.round(game.config.periods.lengthMs / 60_000)));
   const [opponent, setOpponent] = useState(game.opponent);
+  const [tag, setTag] = useState<GameTag | ''>(game.tag ?? '');
 
   const save = async () => {
     await db.games.update(gameId, {
       opponent: opponent.trim(),
+      tag: tag || undefined,
       config: {
         ...game.config,
         periods: { ...game.config.periods, count: periods, lengthMs: minutesOf(lengthMin) * 60_000 },
@@ -399,6 +401,17 @@ function MatchSettings({
         <label className="field">
           <span>Opponent</span>
           <input value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Rovers" />
+        </label>
+        <label className="field">
+          <span>Tag</span>
+          <select value={tag} onChange={(e) => setTag(e.target.value as GameTag | '')}>
+            <option value="">None</option>
+            {Object.entries(GAME_TAG_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </label>
 
         <div className="row">
