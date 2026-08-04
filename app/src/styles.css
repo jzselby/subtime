@@ -1194,7 +1194,15 @@ body.sheet-open .actions {
 .gclock {
   position: absolute;
   left: 50%;
-  top: 50%;
+  /* `.gamebar`'s padding is asymmetric — a big top slice for
+     safe-area-inset-top (the notch/Dynamic Island), a plain 6px on the
+     bottom — but an absolutely positioned child's `top: 50%` centers
+     against the *whole* padding box regardless. That put the clock's
+     centre above where the button row (centred in the smaller content box)
+     actually sits, tucked up under the status bar on a notched phone.
+     Nudging down by half the inset re-centers it against the content box
+     instead. */
+  top: calc(50% + env(safe-area-inset-top) / 2);
   transform: translate(-50%, -50%);
   display: grid;
   justify-items: center;
