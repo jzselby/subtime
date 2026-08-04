@@ -17,6 +17,10 @@ export interface Occupant {
   number: string;
   playedMs: number;
   deficitMs?: number;
+  /** How long since they were last put in this exact spot — a sub, a
+   *  position change, or the start of a period. Undefined where there's no
+   *  game running to measure it against (setup, the formation editor). */
+  currentStintMs?: number;
 }
 
 /**
@@ -184,6 +188,9 @@ export function Pitch({
               occupant ? `${occupant.name}, ${slot.code}` : `${slot.code}, empty`
             }
           >
+            {occupant && !compact && occupant.currentStintMs !== undefined && (
+              <span className="tstint">{mmss(occupant.currentStintMs)}</span>
+            )}
             <span
               className="shirt"
               style={

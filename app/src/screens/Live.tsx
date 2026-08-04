@@ -1,5 +1,5 @@
 import type { GameEvent, PlayerSlot } from '@pitchside/core';
-import { clockAt, fairness, formatClock, playerStats } from '@pitchside/core';
+import { clockAt, fairness, formatClock, playerStats, stintDurationMs } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -178,17 +178,22 @@ export function LiveScreen({ gameId }: { gameId: string }) {
    * is exactly why `buildFormation` goes to the trouble of de-duplicating them.
    */
   const slotByCode = new Map(formation.slots.map((s) => [s.code, s]));
+  // Exactly one open stint per on-field player — its duration is "how long
+  // in this spot," the number the pitch shows above the shirt.
+  const openStint = new Map(state.stints.filter((s) => s.endMs === null).map((s) => [s.playerId, s]));
   const occupants = new Map<string, Occupant>();
   for (const [playerId, code] of state.onField) {
     const slot = slotByCode.get(code);
     if (!slot) continue;
     const p = nameOf(playerId);
+    const stint = openStint.get(playerId);
     occupants.set(slot.id, {
       playerId,
       name: p?.name ?? playerId,
       number: p?.number ?? '',
       playedMs: stats.get(playerId)?.playedMs ?? 0,
       ...(deficitOf.has(playerId) ? { deficitMs: deficitOf.get(playerId) as number } : {}),
+      ...(stint ? { currentStintMs: stintDurationMs(stint, state, now) } : {}),
     });
   }
   const freeCodes = formation.slots.filter((s) => !occupants.has(s.id)).map((s) => s.code);

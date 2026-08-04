@@ -980,6 +980,44 @@ body.sheet-open .actions {
   color: #cfe6dc;
 }
 
+/* Above the shirt rather than below with the game-total .ttime: a different
+   number entirely — how long since this exact spot was last filled, the one
+   a coach actually watches to time a rotation. A filled pill instead of
+   plain text on the pitch background makes clear at a glance it's not the
+   same reading as the total underneath.
+   Absolutely positioned rather than a normal grid row: `.token` is centred
+   on its slot via `translate(-50%, -50%)` against its own rendered size, so
+   a fourth in-flow row would grow that size and push the token's top *and*
+   bottom edges further from centre — on the smallest phone at the biggest
+   squad size, enough to shove the top row's tokens past the pitch's own
+   edge (caught by scripts/checkfit.mjs). Floating it above the shirt
+   instead leaves the token's own footprint, and so the fit math, unchanged. */
+.token .tstint {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  font-size: min(11px, 3.4cqh);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #eafff6;
+  background: var(--accent-dim);
+  border-radius: 8px;
+  padding: 1px 6px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* Same cramped-pitch fallback as .tname just below: a short pitch has no
+   headroom above the top row's shirts either, so this drops rather than
+   getting clipped by .pitch's own overflow: hidden. */
+@container (max-height: 360px) {
+  .token .tstint {
+    display: none;
+  }
+}
+
 /* Bench strip under the pitch: horizontally scrolling shirts. */
 .benchstrip {
   flex: none;
