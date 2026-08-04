@@ -137,7 +137,13 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     if (before < 0 || count <= before) return;
     const e = events[count - 1];
     if (!e) return;
-    notify(describeEvent(e, nameOf));
+    /*
+     * Not for a sub: its own visual feedback — the pitch token swapping
+     * instantly — is plenty, and the toast sat over the bench for its full
+     * 2.2s, hiding exactly the row a coach needs to tap next for a second,
+     * rapid substitution. Everything else still gets one.
+     */
+    if (e.type !== 'SUB') notify(describeEvent(e, nameOf));
     /*
      * Silent for the four that already have their own unmissable signal: a
      * position change is a drag the coach is watching, and pause/resume/end
