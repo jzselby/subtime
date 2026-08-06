@@ -54,8 +54,9 @@ export function Screen({
 let openSheets = 0;
 
 /**
- * The visible height once the on-screen keyboard has taken its bite, or
- * `undefined` where `visualViewport` isn't available.
+ * The visible slice of the layout viewport once the on-screen keyboard has
+ * taken its bite — both where it starts and how tall it is — or `undefined`
+ * where `visualViewport` isn't available.
  *
  * Reported: a sheet with an autofocusing input — Add player, New team, New
  * game, Rename — opened with its input already behind the keyboard. `100dvh`
@@ -64,20 +65,40 @@ let openSheets = 0;
  * viewport a `position: fixed; inset: 0` box sizes against is the *un*-shrunk
  * one, so a bottom-anchored sheet kept anchoring to a bottom that was now
  * off-screen underneath the keyboard.
+ *
+ * `offsetTop` matters just as much as `height`: focusing an input near the
+ * bottom of a tall page makes the browser scroll the *visual* viewport down
+ * to reveal it, independently of the layout viewport `position: fixed`
+ * anchors to. A box still pinned at `top: 0` in that state renders above
+ * where the visible screen now actually starts — reported as a sheet
+ * (opened by "+ New game," itself well down a scrolled team screen) popping
+ * up off the top of the visible area, reachable only by scrolling back up
+ * to where the page used to be. Reading `offsetTop` too, and applying it
+ * as the box's own `top` rather than assuming it's always 0, keeps the
+ * sheet anchored to the visible slice of the screen instead of the
+ * document's.
  */
-function useKeyboardSafeHeight(): number | undefined {
-  const [height, setHeight] = useState<number | undefined>(window.visualViewport?.height);
+function useKeyboardSafeViewport(): { top: number; height: number } | undefined {
+  const read = (vv: VisualViewport) => ({ top: vv.offsetTop, height: vv.height });
+  const [viewport, setViewport] = useState<{ top: number; height: number } | undefined>(() => {
+    const vv = window.visualViewport;
+    return vv ? read(vv) : undefined;
+  });
 
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setHeight(vv.height);
+    const update = () => setViewport(read(vv));
     update();
     vv.addEventListener('resize', update);
-    return () => vv.removeEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
   }, []);
 
-  return height;
+  return viewport;
 }
 
 export function Sheet({
@@ -96,7 +117,7 @@ export function Sheet({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const keyboardSafeHeight = useKeyboardSafeHeight();
+  const keyboardSafeViewport = useKeyboardSafeViewport();
 
   useEffect(() => {
     openSheets += 1;
@@ -126,7 +147,11 @@ export function Sheet({
   return createPortal(
     <div
       className="sheet-backdrop"
-      style={keyboardSafeHeight !== undefined ? { height: keyboardSafeHeight } : undefined}
+      style={
+        keyboardSafeViewport !== undefined
+          ? { top: keyboardSafeViewport.top, height: keyboardSafeViewport.height }
+          : undefined
+      }
       onClick={onClose}
       role="dialog"
       aria-modal="true"

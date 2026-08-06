@@ -1,19 +1,33 @@
 /**
- * A sheet with an autofocusing input must not end up behind the keyboard.
+ * A sheet with an autofocusing input must not end up behind the keyboard,
+ * or off the top of the visible screen.
  *
- * Reported: tapping + New team, + Add player, + New game or Rename — every
- * sheet whose input grabs focus immediately — opened with the input already
- * hidden under the on-screen keyboard. The cause: `.sheet-backdrop` was
- * `position: fixed; inset: 0`, sized against the *layout* viewport, which
- * iOS Safari does not shrink for the keyboard. Only `visualViewport.height`
- * does. A bottom-anchored sheet inside a box still sized to the full,
- * keyboard-unaware height keeps anchoring to a bottom that's now off-screen.
+ * Two separate reports, two dimensions of the same fix:
  *
- * Headless Chromium has no real on-screen keyboard, so this drives the same
- * mechanism the fix actually depends on: it overrides `visualViewport.height`
- * and fires the `resize` event the fix listens for, then checks the backdrop
- * — and the sheet inside it — actually shrink to fit above that line rather
- * than continuing to span the full window.
+ * 1. Tapping + New team, + Add player, + New game or Rename — every sheet
+ *    whose input grabs focus immediately — opened with the input already
+ *    hidden under the on-screen keyboard. The cause: `.sheet-backdrop` was
+ *    `position: fixed; inset: 0`, sized against the *layout* viewport, which
+ *    iOS Safari does not shrink for the keyboard. Only
+ *    `visualViewport.height` does. A bottom-anchored sheet inside a box
+ *    still sized to the full, keyboard-unaware height keeps anchoring to a
+ *    bottom that's now off-screen.
+ *
+ * 2. "+ New game," opened from partway down a scrolled team screen, popped
+ *    up off the top of the visible area — reachable only by scrolling back
+ *    up to where the page used to be. Fixing (1) covers *how tall* the
+ *    backdrop should be once the keyboard is up, but not *where it starts*:
+ *    focusing an input makes the browser scroll the visual viewport to
+ *    reveal it, independently of the layout viewport a `position: fixed`
+ *    box anchors to by default, and a box still pinned at `top: 0` renders
+ *    above wherever the visible area actually starts once that's happened.
+ *
+ * Headless Chromium has no real on-screen keyboard and doesn't scroll for a
+ * simulated one either, so this drives the same mechanism the fix actually
+ * depends on directly: it overrides `visualViewport.height`/`.offsetTop`
+ * and fires the `resize` event the fix listens for, then checks the
+ * backdrop — and the sheet inside it — actually track both rather than
+ * continuing to assume the full, unscrolled window.
  *
  *   node scripts/keyboard.mjs [--headed]
  */
@@ -120,6 +134,72 @@ const heightAfter = await page.evaluate(
   () => document.querySelector('.sheet-backdrop')?.getBoundingClientRect().height,
 );
 check('closing the keyboard restores the full-height backdrop', heightAfter, fullHeight);
+
+/*
+ * `visualViewport.offsetTop`: focusing an input well down a scrolled page
+ * (reported against "+ New game," opened from partway down a team's game
+ * list) makes the browser scroll the *visual* viewport down to reveal it,
+ * independently of the layout viewport a `position: fixed` box anchors to
+ * by default. A backdrop still pinned at `top: 0` in that state renders
+ * above where the visible screen actually starts — reachable only by
+ * scrolling back up to where the page used to be. This simulates that
+ * (offsetTop and height both changing, as they would together) and checks
+ * the fix reads `top` from it rather than assuming the visible area always
+ * starts at the very top of the page.
+ */
+const waitForTop = (expected) =>
+  page
+    .waitForFunction(
+      (t) => document.querySelector('.sheet-backdrop')?.getBoundingClientRect().top === t,
+      expected,
+      { timeout: 2000 },
+    )
+    .catch(() => {});
+
+const SCROLLED_PX = 180;
+await page.evaluate(
+  ({ shrinkBy, scrolledBy }) => {
+    const vv = window.visualViewport;
+    Object.defineProperty(vv, 'height', {
+      configurable: true,
+      get: () => window.innerHeight - shrinkBy,
+    });
+    Object.defineProperty(vv, 'offsetTop', { configurable: true, get: () => scrolledBy });
+    vv.dispatchEvent(new Event('resize'));
+  },
+  { shrinkBy: KEYBOARD_PX, scrolledBy: SCROLLED_PX },
+);
+await waitForTop(SCROLLED_PX);
+
+const scrolled = await page.evaluate(() => {
+  const backdrop = document.querySelector('.sheet-backdrop')?.getBoundingClientRect();
+  const closeBtn = document.querySelector('.sheet .btn.ghost')?.getBoundingClientRect();
+  return { backdropTop: backdrop?.top, backdropHeight: backdrop?.height, closeBtnTop: closeBtn?.top };
+});
+console.log('with the visible area scrolled', SCROLLED_PX, 'px down:', scrolled);
+
+check("the backdrop's top follows the visible area, not the page's own top", scrolled.backdropTop, SCROLLED_PX);
+check('its height still reflects the keyboard', scrolled.backdropHeight, fullHeight - KEYBOARD_PX);
+check(
+  "the sheet's own close button — up near its title bar — stays at or below the visible area's top edge",
+  scrolled.closeBtnTop >= SCROLLED_PX,
+  true,
+);
+
+// -- resetting both recovers the untouched full-window backdrop -------------
+await page.evaluate(() => {
+  const vv = window.visualViewport;
+  Object.defineProperty(vv, 'height', { configurable: true, get: () => window.innerHeight });
+  Object.defineProperty(vv, 'offsetTop', { configurable: true, get: () => 0 });
+  vv.dispatchEvent(new Event('resize'));
+});
+await waitForTop(0);
+const afterReset = await page.evaluate(() => {
+  const r = document.querySelector('.sheet-backdrop')?.getBoundingClientRect();
+  return r && { top: r.top, height: r.height };
+});
+check('resetting both restores the backdrop to the top of the window', afterReset?.top, 0);
+check('and its full height', afterReset?.height, fullHeight);
 
 await browser.close();
 const failed = checks.filter((c) => !c).length;

@@ -587,9 +587,12 @@ body.sheet-open .actions {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  /* Once the keyboard is up, React sets an inline `height` — see
-     useKeyboardSafeHeight in components.tsx — to keep the box (and the
-     bottom-anchored sheet inside it) above it rather than behind it. */
+  /* Once the keyboard is up, React sets inline `top`/`height` — see
+     useKeyboardSafeViewport in components.tsx — to track the actual visible
+     slice of the screen: `height` keeps the box (and the bottom-anchored
+     sheet inside it) above the keyboard rather than behind it, and `top`
+     keeps it anchored to where the visible area currently starts rather
+     than assuming that's always the very top of the page. */
   z-index: 100;
   will-change: transform;
   display: flex;
@@ -604,7 +607,7 @@ body.sheet-open .actions {
   max-width: 720px;
   /* Capped at 86% of the viewport normally, same as always — but also never
      taller than `.sheet-backdrop`'s own box, which shrinks to the keyboard-
-     safe height (see useKeyboardSafeHeight). Without the second bound, a
+     safe height (see useKeyboardSafeViewport). Without the second bound, a
      sheet with enough content to hit 86vh could still render taller than
      what's actually visible once the keyboard is up: the backdrop is
      bottom-anchored, so the sheet's *top* — its title bar, and whatever
