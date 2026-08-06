@@ -223,6 +223,27 @@ begin
     status = excluded.status,
     updated_at = now();
 
+  -- Same reasoning as the event-deletion pass below: a full publishNow()
+  -- always sends the *complete* current games list for the team (see
+  -- collectPayload in app/src/sync.ts), so a game stored here that isn't in
+  -- that batch was deleted locally (deleteGame in db.ts) and should be
+  -- deleted here too — otherwise a deleted game just sits on the dashboard
+  -- forever. Cascades to game_events via that table's own `on delete
+  -- cascade`, so no separate cleanup is needed for the deleted game's
+  -- events. Gated on `data ? 'games'` for the same reason as the events
+  -- gate below: disableDashboard() sends a `data` with no `games` key at
+  -- all, and coalescing that absence to `[]` would read as "every game was
+  -- deleted" and wipe the team's whole history on a routine toggle-off.
+  if data ? 'games' then
+    delete from games gg
+    where gg.team_id = p_team_id
+      and not exists (
+        select 1
+        from jsonb_array_elements(data->'games') as g
+        where g->>'id' = gg.id
+      );
+  end if;
+
   -- Events are *not* immutable in the app — "Modify events" (Events.tsx)
   -- lets a coach correct a mis-recorded scorer/assist/card in place (same
   -- id, changed payload) or delete one outright — so a conflicting id here
