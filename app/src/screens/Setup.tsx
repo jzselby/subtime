@@ -382,6 +382,7 @@ function MatchSettings({
   const [lengthMin, setLengthMin] = useState(String(Math.round(game.config.periods.lengthMs / 60_000)));
   const [opponent, setOpponent] = useState(game.opponent);
   const [tag, setTag] = useState<GameTag | ''>(game.tag ?? '');
+  const [gkWeight, setGkWeight] = useState(game.config.fairness.gkWeight);
 
   const save = async () => {
     await db.games.update(gameId, {
@@ -390,6 +391,7 @@ function MatchSettings({
       config: {
         ...game.config,
         periods: { ...game.config.periods, count: periods, lengthMs: minutesOf(lengthMin) * 60_000 },
+        fairness: { ...game.config.fairness, gkWeight },
       },
     });
     onClose();
@@ -413,6 +415,17 @@ function MatchSettings({
             ))}
           </select>
         </label>
+        <label className="field">
+          <span>Keeper minutes count toward fair share</span>
+          <select value={gkWeight} onChange={(e) => setGkWeight(Number(e.target.value))}>
+            <option value={1}>Fully — a minute is a minute</option>
+            <option value={0.5}>Half credit</option>
+            <option value={0}>Not at all — the keeper is excluded</option>
+          </select>
+        </label>
+        <p className="small muted" style={{ marginTop: -6 }}>
+          Only this game — the team's own default is untouched.
+        </p>
 
         <div className="row">
           <label className="field grow">

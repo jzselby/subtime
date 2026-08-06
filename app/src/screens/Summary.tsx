@@ -564,9 +564,14 @@ ${rows}
 function EditGameSheet({ game, onClose }: { game: Game; onClose: () => void }) {
   const [opponent, setOpponent] = useState(game.opponent);
   const [tag, setTag] = useState<GameTag | ''>(game.tag ?? '');
+  const [gkWeight, setGkWeight] = useState(game.config.fairness.gkWeight);
 
   const save = async () => {
-    await db.games.update(game.id, { opponent: opponent.trim(), tag: tag || undefined });
+    await db.games.update(game.id, {
+      opponent: opponent.trim(),
+      tag: tag || undefined,
+      config: { ...game.config, fairness: { ...game.config.fairness, gkWeight } },
+    });
     onClose();
   };
 
@@ -594,6 +599,19 @@ function EditGameSheet({ game, onClose }: { game: Game; onClose: () => void }) {
             ))}
           </select>
         </label>
+        <label className="field">
+          <span>Keeper minutes count toward fair share</span>
+          <select value={gkWeight} onChange={(e) => setGkWeight(Number(e.target.value))}>
+            <option value={1}>Fully — a minute is a minute</option>
+            <option value={0.5}>Half credit</option>
+            <option value={0}>Not at all — the keeper is excluded</option>
+          </select>
+        </label>
+        <p className="small muted" style={{ marginTop: -6 }}>
+          Only this game — the team's own default is untouched. Changing it
+          recalculates this game's fairness figures immediately; reported
+          minutes never change, only the targets they're measured against.
+        </p>
         <button className="btn primary block" onClick={() => void save()}>
           Save
         </button>
