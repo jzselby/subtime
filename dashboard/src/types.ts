@@ -44,3 +44,41 @@ export interface DashboardSnapshot {
   games: DashboardGame[];
   events: DashboardEvent[];
 }
+
+/** The exact shape `get_team_scoreboard()` returns — see
+ *  supabase/schema.sql. Deliberately much smaller than DashboardSnapshot:
+ *  no roster, no event log, no playing time — see that function's own
+ *  comment for why that's a structural guarantee, not just this type. */
+export interface ScoreboardGoal {
+  period: number;
+  clockMs: number;
+  team: 'us' | 'them';
+  scorerName: string | null;
+  assistName: string | null;
+  penalty: boolean;
+  ownGoal: boolean;
+}
+
+export interface ScoreboardGame {
+  opponent: string | null;
+  kickoff_at: string;
+  status: 'setup' | 'live' | 'final';
+  tag: string | null;
+  periods: { count: number; lengthMs: number };
+  score_us: number;
+  score_them: number;
+  /** The reducer's own finer state, not `status` above — lets the page tell
+   *  "half-time" and "paused" apart from "final". */
+  clock_status: 'pregame' | 'running' | 'paused' | 'break' | 'final';
+  clock_period: number;
+  clock_ms: number;
+  clock_anchor: { wallTs: number; clockMs: number } | null;
+  period_elapsed_ms: number[];
+  goals: ScoreboardGoal[];
+}
+
+export interface ScoreboardSnapshot {
+  team: { name: string; age_group: string | null };
+  /** Null for a team that's never published a game yet. */
+  game: ScoreboardGame | null;
+}

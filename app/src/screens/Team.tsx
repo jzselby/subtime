@@ -17,7 +17,14 @@ import {
 } from '../db';
 import { LogPastGameSheet } from './LogPastGame';
 import { navigate } from '../router';
-import { dashboardConfigured, dashboardUrl, disableDashboard, enableDashboard, publishNow } from '../sync';
+import {
+  dashboardConfigured,
+  dashboardUrl,
+  disableDashboard,
+  enableDashboard,
+  publishNow,
+  scoreboardUrl,
+} from '../sync';
 
 export function TeamScreen({ teamId }: { teamId: string }) {
   const team = useLiveQuery(() => db.teams.get(teamId), [teamId]);
@@ -422,14 +429,19 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
 
   // `team` is a live-query snapshot from the parent, so once
   // enable/disable/publish lands locally, this prop re-renders with it —
-  // `justEnabledUrl` only covers the gap before that reactive update
+  // `justEnabled` only covers the gap before that reactive update
   // arrives, so the link appears the instant Enable resolves rather than
   // flickering "not yet enabled" for one render.
   const [dashBusy, setDashBusy] = useState(false);
   const [dashError, setDashError] = useState<string | null>(null);
   const [dashCopied, setDashCopied] = useState(false);
-  const [justEnabledUrl, setJustEnabledUrl] = useState<string | null>(null);
-  const shareUrl = justEnabledUrl ?? dashboardUrl(team);
+  const [scoreCopied, setScoreCopied] = useState(false);
+  const [justEnabled, setJustEnabled] = useState<{
+    dashboardUrl: string;
+    scoreboardUrl: string;
+  } | null>(null);
+  const shareUrl = justEnabled?.dashboardUrl ?? dashboardUrl(team);
+  const parentUrl = justEnabled?.scoreboardUrl ?? scoreboardUrl(team);
 
   const runDashAction = async (action: () => Promise<void>) => {
     setDashBusy(true);
@@ -443,11 +455,12 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
     }
   };
 
-  const handleShareLink = async () => {
-    if (!shareUrl) return;
+  /** Shared by both links below — the OS share sheet where available, a
+   *  clipboard copy (with its own 2s confirmation) otherwise. */
+  const shareOrCopy = async (url: string, title: string, setCopied: (v: boolean) => void) => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: `${team.name} — season stats`, url: shareUrl });
+        await navigator.share({ title, url });
         return;
       } catch (err) {
         // A cancelled share sheet throws AbortError; fall through to copy
@@ -455,9 +468,19 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
         if ((err as Error)?.name === 'AbortError') return;
       }
     }
-    await navigator.clipboard.writeText(shareUrl);
-    setDashCopied(true);
-    setTimeout(() => setDashCopied(false), 2000);
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShareLink = async () => {
+    if (!shareUrl) return;
+    await shareOrCopy(shareUrl, `${team.name} — season stats`, setDashCopied);
+  };
+
+  const handleShareScoreboardLink = async () => {
+    if (!parentUrl) return;
+    await shareOrCopy(parentUrl, `${team.name} — live score`, setScoreCopied);
   };
 
   return (
@@ -525,7 +548,7 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
             <>
               <div className="row" style={{ gap: 8 }}>
                 <button className="btn grow" onClick={() => void handleShareLink()}>
-                  {dashCopied ? '✓ Copied' : 'Share link'}
+                  {dashCopied ? '✓ Copied' : 'Share coach link'}
                 </button>
                 <button
                   className="btn"
@@ -538,6 +561,23 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
               <p className="small muted" style={{ marginTop: -6, wordBreak: 'break-all' }}>
                 {shareUrl}
               </p>
+
+              {parentUrl && (
+                <>
+                  <button className="btn block" onClick={() => void handleShareScoreboardLink()}>
+                    {scoreCopied ? '✓ Copied' : 'Share live score with parents'}
+                  </button>
+                  <p className="small muted" style={{ marginTop: -6, wordBreak: 'break-all' }}>
+                    {parentUrl}
+                  </p>
+                  <p className="small muted" style={{ marginTop: -6 }}>
+                    Score, clock, and who scored — nothing else. No roster,
+                    no positions, no playing time. Safe to hand out to any
+                    parent.
+                  </p>
+                </>
+              )}
+
               <button
                 className="btn ghost block"
                 disabled={dashBusy}
@@ -550,9 +590,7 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
             <button
               className="btn block"
               disabled={dashBusy}
-              onClick={() =>
-                void runDashAction(async () => setJustEnabledUrl(await enableDashboard(team)))
-              }
+              onClick={() => void runDashAction(async () => setJustEnabled(await enableDashboard(team)))}
             >
               {dashBusy ? 'Setting up…' : 'Share a live dashboard with other coaches'}
             </button>

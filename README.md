@@ -259,10 +259,18 @@ This is one-way. The app publishes; the [`dashboard/`](./dashboard) site — a
 separate, small static page, not part of the installable PWA — reads. Nothing
 here lets a second device pick up a live game; that's a deliberately
 different, much larger problem this doesn't attempt. `supabase/schema.sql`
-has the backend side: two Postgres functions are the only way in or out for
-the public key, one gated by the token in the share link (read), one by a
-key that never leaves the coach's device (write) — see the comments there
-for the reasoning.
+has the backend side: three Postgres functions are the only way in or out for
+the public key — one gated by the token in the share link (read, full
+stats), one by a second, separate token for the parent scoreboard below
+(read, score/clock only), one by a key that never leaves the coach's device
+(write) — see the comments there for the reasoning.
+
+Alongside it, the same settings screen has a **Share live score with
+parents** link — score, clock, and who scored, nothing else. It's a
+separate token from the coach link, gated by a Postgres function
+(`get_team_scoreboard`) that structurally never touches the event log, so it
+can't leak playing time even by accident; see that function's comment in
+`supabase/schema.sql`. Both links come from the same "enable" toggle.
 
 **Current state:** built and unit/manually verified without a live backend;
 not yet exercised against a real Supabase project (needs one created and its

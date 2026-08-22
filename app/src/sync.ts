@@ -1,3 +1,4 @@
+import { reduce } from '@pitchside/core';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { db, uid, type Team } from './db';
 
@@ -44,6 +45,15 @@ export function dashboardUrl(team: Team): string | null {
   return url.toString();
 }
 
+/** The parent scoreboard link — score and clock only, never a roster or a
+ *  minute of playing time. See supabase/schema.sql's get_team_scoreboard. */
+export function scoreboardUrl(team: Team): string | null {
+  if (!team.parentShareToken || !dashboardBaseUrl) return null;
+  const url = new URL(dashboardBaseUrl);
+  url.searchParams.set('p', team.parentShareToken);
+  return url.toString();
+}
+
 /** Everything a team needs to publish, read straight off the local tables. */
 async function collectPayload(teamId: string) {
   const [players, games] = await Promise.all([
@@ -55,15 +65,40 @@ async function collectPayload(teamId: string) {
   );
   return {
     players: players.map((p) => ({ id: p.id, name: p.name, number: p.number, active: p.active })),
-    games: games.map((g) => ({
-      id: g.id,
-      opponent: g.opponent,
-      kickoff_at: new Date(g.kickoffAt).toISOString(),
-      config: g.config,
-      formation: g.formation,
-      status: g.status,
-      tag: g.tag ?? null,
-    })),
+    // Score/clock/goals are folded here with the same reduce() the live app
+    // and the coach dashboard already use — "one fold, many callers" — and
+    // published as their own columns (see games.goals's comment in
+    // schema.sql) specifically so the parent scoreboard's RPC never has to
+    // touch the raw event log to answer "what's the score." The raw events
+    // still go up too, unchanged, for the coach dashboard's fuller view.
+    games: games.map((g, i) => {
+      const { state } = reduce(eventsByGame[i] ?? [], g.config, g.id);
+      return {
+        id: g.id,
+        opponent: g.opponent,
+        kickoff_at: new Date(g.kickoffAt).toISOString(),
+        config: g.config,
+        formation: g.formation,
+        status: g.status,
+        tag: g.tag ?? null,
+        score_us: state.score.us,
+        score_them: state.score.them,
+        clock_status: state.status,
+        clock_period: state.period,
+        clock_ms: state.clockMs,
+        clock_anchor: state.anchor,
+        period_elapsed_ms: state.periodElapsedMs,
+        goals: state.goals.map((goal) => ({
+          period: goal.period,
+          clockMs: goal.clockMs,
+          team: goal.team,
+          scorerId: goal.scorerId,
+          assistId: goal.assistId,
+          penalty: goal.penalty,
+          ownGoal: goal.ownGoal,
+        })),
+      };
+    }),
     events: eventsByGame.flat().map((e) => ({
       id: e.id,
       game_id: e.gameId,
@@ -91,11 +126,21 @@ export async function publishNow(
   if (!team.publishKey || !team.shareToken) {
     throw new Error('This team has not enabled the dashboard yet.');
   }
+  // A team enabled before the parent scoreboard existed has no
+  // parentShareToken yet. Generate one transparently on its next publish —
+  // same as a brand-new enable does — so a coach who already turned the
+  // dashboard on doesn't have to do anything to pick up the new link.
+  let parentShareToken = team.parentShareToken;
+  if (!parentShareToken) {
+    parentShareToken = uid();
+    await db.teams.update(team.id, { parentShareToken });
+  }
   const { players, games, events } = await collectPayload(team.id);
   const { error } = await getClient().rpc('publish_team_data', {
     key: team.publishKey,
     p_team_id: team.id,
     share_token: team.shareToken,
+    parent_share_token: parentShareToken,
     data: {
       team: {
         name: team.name,
@@ -125,18 +170,28 @@ export async function publishNow(
  * existing tokens either way — the share link a coach already saved keeps
  * working rather than silently breaking the moment it's toggled back on.
  */
-export async function enableDashboard(team: Team): Promise<string> {
+export async function enableDashboard(
+  team: Team,
+): Promise<{ dashboardUrl: string; scoreboardUrl: string }> {
   const shareToken = team.shareToken ?? uid();
+  const parentShareToken = team.parentShareToken ?? uid();
   const publishKey = team.publishKey ?? uid();
-  const candidate: Team = { ...team, dashboardEnabled: true, shareToken, publishKey };
+  const candidate: Team = {
+    ...team,
+    dashboardEnabled: true,
+    shareToken,
+    parentShareToken,
+    publishKey,
+  };
 
   await publishNow(candidate, { dashboardEnabled: true });
 
-  await db.teams.update(team.id, { dashboardEnabled: true, shareToken, publishKey });
+  await db.teams.update(team.id, { dashboardEnabled: true, shareToken, parentShareToken, publishKey });
 
-  const url = dashboardUrl(candidate);
-  if (!url) throw new Error('The dashboard link could not be built for this build.');
-  return url;
+  const dashUrl = dashboardUrl(candidate);
+  const scoreUrl = scoreboardUrl(candidate);
+  if (!dashUrl || !scoreUrl) throw new Error('The dashboard link could not be built for this build.');
+  return { dashboardUrl: dashUrl, scoreboardUrl: scoreUrl };
 }
 
 /**

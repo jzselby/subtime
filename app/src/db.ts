@@ -37,6 +37,11 @@ export interface Team {
   /** The secret in the dashboard URL. Read-only once shared: regenerating it
    *  would silently break a link a coach has already handed out. */
   shareToken?: string;
+  /** The secret in the parent scoreboard URL — a separate, more widely
+   *  shareable link than `shareToken`'s: it only ever resolves to the
+   *  current score and clock, never a roster or playing time. Same
+   *  read-only-once-shared rule as `shareToken`. */
+  parentShareToken?: string;
   /** Stays on this device. Gates writes to this team's row in Supabase —
    *  never rendered, copied, or shared alongside `shareToken`. */
   publishKey?: string;
