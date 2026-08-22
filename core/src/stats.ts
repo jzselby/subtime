@@ -17,6 +17,40 @@ export function stintDurationMs(stint: Stint, state: GameState, nowWallTs: numbe
 }
 
 /**
+ * How long a player has been on the field for their *current shift* —
+ * chained back through any `POSITION_CHANGE` (or a `SET_LINEUP` edit that
+ * only moves someone, not subs them) since those close one stint and open
+ * the next at the very same instant, with no time off the field in between.
+ * Stops at a real gap — a sub off then back on, or the top of the period —
+ * since those genuinely start a new shift.
+ *
+ * Distinct from `stintDurationMs`, which is scoped to one position and
+ * resets on every `POSITION_CHANGE`; this is "time since I came on," not
+ * "time in this exact spot."
+ */
+export function currentRotationMs(
+  state: GameState,
+  playerId: PlayerId,
+  nowWallTs: number,
+): number | null {
+  const idx = state.openStintIdx.get(playerId);
+  const openStint = idx === undefined ? undefined : state.stints[idx];
+  if (idx === undefined || !openStint) return null;
+
+  let startMs = openStint.startMs;
+  for (let i = idx - 1; i >= 0; i--) {
+    const prev = state.stints[i];
+    if (!prev || prev.playerId !== playerId) continue;
+    // Stints are appended in event order, so once a same-player stint from
+    // an earlier period turns up, every one before it is too — nothing
+    // further back can still be within the open stint's period.
+    if (prev.period !== openStint.period || prev.endMs !== startMs) break;
+    startMs = prev.startMs;
+  }
+  return Math.max(0, stintEndMs(openStint, state, nowWallTs) - startMs);
+}
+
+/**
  * Independent replay that tracks only the *number* of players on the field and
  * integrates it over game-clock time: ∫ onFieldCount dt.
  *

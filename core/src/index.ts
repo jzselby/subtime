@@ -23,6 +23,7 @@ export { appearsInLog, playerIdsIn } from './players.js';
 export {
   aggregatePlayerStats,
   availablePlayers,
+  currentRotationMs,
   fairness,
   fairnessIndex,
   fieldTimeIntegralMs,
