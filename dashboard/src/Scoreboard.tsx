@@ -44,6 +44,20 @@ function liveClockMs(game: ScoreboardGame): number {
   return game.clock_ms;
 }
 
+/** 'W' | 'L' | 'D', or null for a game with no result yet (live, or the
+ *  rare not-yet-started one that slipped through — 'setup' is filtered out
+ *  server-side, so this only ever sees 'live' or 'final'). */
+function resultOf(game: ScoreboardGame): 'W' | 'L' | 'D' | null {
+  if (game.status !== 'final') return null;
+  if (game.score_us > game.score_them) return 'W';
+  if (game.score_us < game.score_them) return 'L';
+  return 'D';
+}
+
+function gameDate(game: ScoreboardGame): string {
+  return new Date(game.kickoff_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function StatusPill({ game }: { game: ScoreboardGame }) {
   useTick(game.clock_status === 'running');
 
@@ -84,15 +98,73 @@ function GoalRow({ goal, periodCount }: { goal: ScoreboardGame['goals'][number];
   );
 }
 
-/** Team-name initial, for the crest circle — the first letter that isn't
- *  whitespace, so a name starting with a space (unlikely, but free to
- *  guard) doesn't render a blank badge. */
+/** The score card + status pill + goal feed for one game — shared by the
+ *  "current" view and a drilled-into past game, so the two only ever look
+ *  like the same design applied to a different game. */
+function GameCard({ game }: { game: ScoreboardGame }) {
+  return (
+    <>
+      <div className="sb-card">
+        <div className="sb-score">
+          {game.score_us}
+          <span>–</span>
+          {game.score_them}
+        </div>
+        <StatusPill game={game} />
+      </div>
+      {game.goals.length > 0 && (
+        <ul className="sb-goals">
+          {[...game.goals].reverse().map((goal, i) => (
+            <GoalRow key={i} goal={goal} periodCount={game.periods.count} />
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function ResultBadge({ game }: { game: ScoreboardGame }) {
+  if (game.status === 'live') return <span className="sb-badge sb-badge-live">Live</span>;
+  const result = resultOf(game);
+  if (!result) return null;
+  return <span className={`sb-badge sb-badge-${result.toLowerCase()}`}>{result}</span>;
+}
+
+function PastGamesList({ games, onSelect }: { games: ScoreboardGame[]; onSelect: (id: string) => void }) {
+  return (
+    <ul className="sb-results">
+      {games.map((game) => (
+        <li key={game.id}>
+          <button className="sb-result-row" onClick={() => onSelect(game.id)}>
+            <span className="sb-result-date">{gameDate(game)}</span>
+            <span className="sb-result-opp">vs {game.opponent || 'TBD'}</span>
+            <ResultBadge game={game} />
+            <span className="sb-result-score">
+              {game.score_us}–{game.score_them}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type View = { kind: 'current' } | { kind: 'list' } | { kind: 'game'; id: string };
+
 function crestInitial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
 }
 
 function ScoreboardBody({ snapshot }: { snapshot: ScoreboardSnapshot }) {
-  const { team, game } = snapshot;
+  const { team, games } = snapshot;
+  const [view, setView] = useState<View>({ kind: 'current' });
+
+  const current = games[0];
+  const selected = view.kind === 'game' ? games.find((g) => g.id === view.id) : undefined;
+  // A game the viewer drilled into can vanish from a later poll only in
+  // freak cases (the coach deleted it) — falling back to "current" rather
+  // than rendering nothing.
+  const shown = view.kind === 'list' ? undefined : (selected ?? current);
 
   return (
     <>
@@ -102,36 +174,46 @@ function ScoreboardBody({ snapshot }: { snapshot: ScoreboardSnapshot }) {
           <div className="sb-crest">{crestInitial(team.name)}</div>
           <div>
             <p className="sb-team-name">{team.name}</p>
-            {game && (
+            {shown && (
               <p className="sb-meta">
-                vs {game.opponent || 'TBD'}
-                {game.tag ? ` · ${TAG_LABELS[game.tag] ?? game.tag}` : ''}
+                vs {shown.opponent || 'TBD'}
+                {shown.tag ? ` · ${TAG_LABELS[shown.tag] ?? shown.tag}` : ''}
               </p>
             )}
           </div>
         </div>
-        {!game && <p className="sb-empty-note">No game yet.</p>}
+        {games.length === 0 && <p className="sb-empty-note">No game yet.</p>}
+        {games.length > 0 &&
+          (view.kind === 'game' ? (
+            // Everything that isn't the floating score card lives inside
+            // the band on purpose — the card overlaps the band's bottom
+            // edge by design (see .sb-card), and anything placed between
+            // them in normal flow sits underneath that overlap and can't
+            // be clicked, not just visually covered.
+            <button className="sb-back" onClick={() => setView({ kind: 'list' })}>
+              ← Past Games
+            </button>
+          ) : (
+            <nav className="sb-nav">
+              <button
+                className={`sb-nav-btn${view.kind === 'current' ? ' active' : ''}`}
+                onClick={() => setView({ kind: 'current' })}
+              >
+                {current?.status === 'live' ? 'Live' : 'Latest'}
+              </button>
+              <button
+                className={`sb-nav-btn${view.kind === 'list' ? ' active' : ''}`}
+                onClick={() => setView({ kind: 'list' })}
+              >
+                Past Games
+              </button>
+            </nav>
+          ))}
       </div>
 
-      {game && (
-        <>
-          <div className="sb-card">
-            <div className="sb-score">
-              {game.score_us}
-              <span>–</span>
-              {game.score_them}
-            </div>
-            <StatusPill game={game} />
-          </div>
-          {game.goals.length > 0 && (
-            <ul className="sb-goals">
-              {[...game.goals].reverse().map((goal, i) => (
-                <GoalRow key={i} goal={goal} periodCount={game.periods.count} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+      {view.kind === 'list' && <PastGamesList games={games} onSelect={(id) => setView({ kind: 'game', id })} />}
+
+      {shown && <GameCard game={shown} />}
     </>
   );
 }

@@ -911,3 +911,122 @@ h2 {
   font-weight: 500;
 }
 
+/* Lives inside .sb-band (dark), not the paper below — this is what keeps
+   it clear of .sb-card's negative top margin, which overlaps the band's
+   bottom edge, not whatever sits between the band and the card. */
+.sb-nav {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 0;
+}
+
+.sb-nav-btn {
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.sb-nav-btn.active {
+  background: var(--sb-yellow);
+  border-color: var(--sb-yellow);
+  color: var(--sb-yellow-ink);
+}
+
+.sb-back {
+  display: block;
+  margin: 18px 0 0;
+  border: none;
+  background: none;
+  color: var(--sb-yellow);
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* -- past games list -------------------------------------------------- */
+
+.sb-results {
+  list-style: none;
+  margin: 16px 22px 0;
+  padding: 0;
+  text-align: left;
+}
+
+.sb-result-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 0 0 8px;
+  font-family: 'Manrope', system-ui, sans-serif;
+  color: var(--sb-ink);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 6px 14px -10px rgba(18, 18, 18, 0.35);
+}
+
+.sb-result-date {
+  flex: none;
+  width: 44px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sb-gray);
+}
+
+.sb-result-opp {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-result-score {
+  flex: none;
+  font-family: 'Bebas Neue', 'Manrope', sans-serif;
+  font-size: 20px;
+  color: var(--sb-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-badge {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Win/loss/draw is semantic, not the club's own black/yellow/grey identity
+   — kept deliberately separate from --sb-yellow so a result never reads as
+   "the accent colour," the same reasoning dataviz work generally gives for
+   not letting a status colour double as a brand hue. */
+.sb-badge-w { background: #2f8f4e; }
+.sb-badge-l { background: #b3413a; }
+.sb-badge-d { background: var(--sb-gray); }
+.sb-badge-live {
+  width: auto;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--sb-yellow);
+  color: var(--sb-yellow-ink);
+}
+

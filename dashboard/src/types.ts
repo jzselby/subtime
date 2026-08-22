@@ -60,6 +60,7 @@ export interface ScoreboardGoal {
 }
 
 export interface ScoreboardGame {
+  id: string;
   opponent: string | null;
   kickoff_at: string;
   status: 'setup' | 'live' | 'final';
@@ -79,6 +80,9 @@ export interface ScoreboardGame {
 
 export interface ScoreboardSnapshot {
   team: { name: string; age_group: string | null };
-  /** Null for a team that's never published a game yet. */
-  game: ScoreboardGame | null;
+  /** Every game that's live or already played, live game first (if any),
+   *  then most recent kickoff first — see get_team_scoreboard's own
+   *  comment. `games[0]` is "current"; the rest is "Past Games". Empty for
+   *  a team that's never published a game past 'setup' yet. */
+  games: ScoreboardGame[];
 }

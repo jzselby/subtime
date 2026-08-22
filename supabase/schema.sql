@@ -400,10 +400,14 @@ grant execute on function publish_team_data(uuid, text, jsonb, uuid, uuid) to an
 --
 -- Resolves the same set of games a coach's dashboard would show (see
 -- foldGames in dashboard/src/games.ts — 'setup' games excluded there too):
--- the team's live game if one is running, else the most recent one that's
--- actually been played. Returns null for `game` if the team has nothing
--- past 'setup' yet — a token for a brand new team, or one with only a
--- future game scheduled, is a valid link, just with nothing to show.
+-- every game that's live or already played, ordered live-first then most
+-- recent kickoff first. `games[0]` is what the app treats as "current" —
+-- the team's live game if one is running, else the most recent one played
+-- — and the rest is the "Past Games" list, so no separate query or
+-- endpoint is needed for that: one array serves both. Returns `[]` for a
+-- team with nothing past 'setup' yet — a token for a brand new team, or
+-- one with only a future game scheduled, is a valid link, just with
+-- nothing to show.
 create or replace function get_team_scoreboard(token uuid)
 returns jsonb
 language sql
@@ -412,8 +416,9 @@ set search_path = public
 as $$
   select jsonb_build_object(
     'team', jsonb_build_object('name', t.name, 'age_group', t.age_group),
-    'game', (
-      select jsonb_build_object(
+    'games', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'id', g.id,
         'opponent', g.opponent,
         'kickoff_at', g.kickoff_at,
         'status', g.status,
@@ -440,18 +445,16 @@ as $$
           left join players scorer on scorer.id = goal->>'scorerId'
           left join players assist on assist.id = goal->>'assistId'
         )
-      )
+      ) order by (g.status = 'live') desc, g.kickoff_at desc), '[]'::jsonb)
       from games g
       -- 'setup' excluded, same as foldGames() on the coach dashboard: a
       -- game scheduled ahead of kickoff isn't "current" to a parent, and
       -- without this a future 'setup' game with a later kickoff_at would
-      -- outrank today's actual live or just-finished game in the order by
-      -- below, hiding the real result behind a "Kickoff soon" placeholder
-      -- for a game that hasn't happened yet.
+      -- sort ahead of today's actual live or just-finished game, hiding
+      -- the real result behind a "Kickoff soon" placeholder for a game
+      -- that hasn't happened yet.
       where g.team_id = t.id
         and g.status <> 'setup'
-      order by (g.status = 'live') desc, g.kickoff_at desc
-      limit 1
     )
   )
   from teams t
