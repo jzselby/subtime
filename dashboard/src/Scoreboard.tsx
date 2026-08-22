@@ -44,7 +44,7 @@ function liveClockMs(game: ScoreboardGame): number {
   return game.clock_ms;
 }
 
-function StatusLine({ game }: { game: ScoreboardGame }) {
+function StatusPill({ game }: { game: ScoreboardGame }) {
   useTick(game.clock_status === 'running');
 
   if (game.clock_status === 'pregame') {
@@ -75,43 +75,62 @@ function GoalRow({ goal, periodCount }: { goal: ScoreboardGame['goals'][number];
         }${goal.ownGoal ? ' — own goal' : ''}`;
   return (
     <li className={`sb-goal${goal.team === 'them' ? ' sb-goal-them' : ''}`}>
+      <span className="sb-goal-tick" />
       <span className="sb-goal-time">
         {periodTag(periodCount, goal.period)} {mmss(goal.clockMs)}
       </span>
-      <span>{label}</span>
+      <span className="sb-goal-who">{label}</span>
     </li>
   );
+}
+
+/** Team-name initial, for the crest circle — the first letter that isn't
+ *  whitespace, so a name starting with a space (unlikely, but free to
+ *  guard) doesn't render a blank badge. */
+function crestInitial(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '?';
 }
 
 function ScoreboardBody({ snapshot }: { snapshot: ScoreboardSnapshot }) {
   const { team, game } = snapshot;
 
-  if (!game) {
-    return (
-      <>
-        <h1>{team.name}</h1>
-        <p className="muted">No game yet.</p>
-      </>
-    );
-  }
-
   return (
     <>
-      <h1>{team.name}</h1>
-      <p className="muted">
-        vs {game.opponent || 'TBD'}
-        {game.tag ? ` · ${TAG_LABELS[game.tag] ?? game.tag}` : ''}
-      </p>
-      <div className="sb-score">
-        {game.score_us}–{game.score_them}
+      <div className="sb-band">
+        <p className="sb-brand">Pitchside · Live</p>
+        <div className="sb-team-row">
+          <div className="sb-crest">{crestInitial(team.name)}</div>
+          <div>
+            <p className="sb-team-name">{team.name}</p>
+            {game && (
+              <p className="sb-meta">
+                vs {game.opponent || 'TBD'}
+                {game.tag ? ` · ${TAG_LABELS[game.tag] ?? game.tag}` : ''}
+              </p>
+            )}
+          </div>
+        </div>
+        {!game && <p className="sb-empty-note">No game yet.</p>}
       </div>
-      <StatusLine game={game} />
-      {game.goals.length > 0 && (
-        <ul className="sb-goals">
-          {[...game.goals].reverse().map((goal, i) => (
-            <GoalRow key={i} goal={goal} periodCount={game.periods.count} />
-          ))}
-        </ul>
+
+      {game && (
+        <>
+          <div className="sb-card">
+            <div className="sb-score">
+              {game.score_us}
+              <span>–</span>
+              {game.score_them}
+            </div>
+            <StatusPill game={game} />
+          </div>
+          {game.goals.length > 0 && (
+            <ul className="sb-goals">
+              {[...game.goals].reverse().map((goal, i) => (
+                <GoalRow key={i} goal={goal} periodCount={game.periods.count} />
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </>
   );
@@ -120,8 +139,16 @@ function ScoreboardBody({ snapshot }: { snapshot: ScoreboardSnapshot }) {
 export function Scoreboard({ token }: { token: string | null }) {
   const result = useScoreboard(token);
 
+  if (result.status === 'ready') {
+    return (
+      <div className="sb-page">
+        <ScoreboardBody snapshot={result.snapshot} />
+      </div>
+    );
+  }
+
   return (
-    <div className="sb-page">
+    <div className="sb-page sb-simple">
       <p className="sb-brand">Pitchside · Live</p>
       {result.status === 'not-configured' && (
         <div className="empty">This page isn't configured — it's missing its Supabase URL/key.</div>
@@ -139,7 +166,6 @@ export function Scoreboard({ token }: { token: string | null }) {
           may have turned it off. ({result.message})
         </div>
       )}
-      {result.status === 'ready' && <ScoreboardBody snapshot={result.snapshot} />}
     </div>
   );
 }
