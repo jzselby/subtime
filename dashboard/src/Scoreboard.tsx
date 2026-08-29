@@ -157,7 +157,15 @@ function crestInitial(name: string): string {
 
 function ScoreboardBody({ snapshot }: { snapshot: ScoreboardSnapshot }) {
   const { team, games } = snapshot;
-  const [view, setView] = useState<View>({ kind: 'current' });
+  // Opens straight on the score only when a game is actually in progress —
+  // that's the point of this link. Otherwise it lands on Past Games rather
+  // than surfacing the last result the instant the page loads; a parent
+  // still gets there in one tap via the "Latest" pill. The lazy initializer
+  // reads `games` once, on mount, so a game going live later while someone
+  // is already browsing doesn't yank them out of the list to follow it.
+  const [view, setView] = useState<View>(() =>
+    games[0]?.status === 'live' ? { kind: 'current' } : { kind: 'list' },
+  );
 
   const current = games[0];
   const selected = view.kind === 'game' ? games.find((g) => g.id === view.id) : undefined;
