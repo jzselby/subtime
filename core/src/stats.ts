@@ -86,6 +86,7 @@ export function fieldTimeIntegralMs(
         clock = 0;
         break;
       case 'PERIOD_END':
+      case 'GAME_END':
       case 'CLOCK_PAUSE':
         accrue(e.gameClockMs);
         running = false;

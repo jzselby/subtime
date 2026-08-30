@@ -17,13 +17,73 @@ export function SetupScreen({ gameId }: { gameId: string }) {
     [game?.teamId],
   );
 
-  /** slot id → player id */
+  /*
+   * slot id → player id. Local, not derived from `state.onField` on every
+   * render, because a drag needs to feel instant and can't wait on an async
+   * IndexedDB write mid-gesture — but every real change is also persisted
+   * as a SET_LINEUP event below, immediately, the same way ATTENDANCE
+   * already is. Before this, a lineup built here lived only in this
+   * component's memory until "Start game" committed it once — so a coach
+   * who set the lineup, then left this screen (or had the app reloaded out
+   * from under them, which iOS does to backgrounded installed PWAs) before
+   * tapping Start came back to find it gone, with nothing to blame it on.
+   * Now every drag/tap is durable the instant it happens, exactly like a
+   * sub or a goal already is once a game is live.
+   */
   const [lineup, setLineup] = useState<Record<string, string>>({});
   const [picking, setPicking] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [attendance, setAttendance] = useState(false);
 
-  const { state, recordMany } = useGameLog(gameId, game?.config ?? DEFAULT_CFG);
+  const { state, recordMany, loading } = useGameLog(gameId, game?.config ?? DEFAULT_CFG);
+
+  /** Fire-and-forget SET_LINEUP for whatever the lineup now is — called
+   *  after every mutation below, so the draft is never more than one
+   *  change away from what's actually on disk. */
+  const persistLineup = (next: Record<string, string>): Promise<void> => {
+    if (!game) return Promise.resolve();
+    const slots: PlayerSlot[] = game.formation.slots
+      .filter((s) => next[s.id])
+      .map((s) => ({ playerId: next[s.id] as string, position: s.code }));
+    return recordMany([{ type: 'SET_LINEUP' as const, slots }]);
+  };
+
+  /*
+   * Guard against ever reaching this screen for a game that isn't actually
+   * in setup. Ordinary navigation can't produce this today — Team.tsx
+   * branches on status before linking here, and start() replaces history
+   * rather than pushing — but every interaction here now writes a real
+   * SET_LINEUP event immediately (see persistLineup below), not just once
+   * on Start. Before that change, landing here for a live game by some
+   * stray route (a stale bookmark, a browser back after status changed
+   * elsewhere) was merely confusing; now it would let a drag silently pull
+   * a player off the field mid-match. Redirect to wherever the game
+   * actually is, same destinations Formation.tsx's back button already
+   * uses for the same reason.
+   */
+  useEffect(() => {
+    if (!game) return;
+    if (game.status === 'live') navigate({ name: 'live', gameId }, true);
+    else if (game.status === 'final') navigate({ name: 'summary', gameId }, true);
+  }, [game?.status, gameId]);
+
+  // Restore a lineup already persisted from an earlier session — runs once,
+  // as soon as the (possibly empty) event log has actually loaded, so it
+  // never fires against the loading hook's default empty state and never
+  // re-fires to clobber an edit made since.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current || loading || !game) return;
+    hydrated.current = true;
+    if (state.onField.size === 0) return;
+    const slotByCode = new Map(game.formation.slots.map((s) => [s.code, s.id]));
+    const restored: Record<string, string> = {};
+    for (const [playerId, code] of state.onField) {
+      const slotId = slotByCode.get(code);
+      if (slotId) restored[slotId] = playerId;
+    }
+    if (Object.keys(restored).length > 0) setLineup(restored);
+  }, [loading, game, state.onField]);
 
   /*
    * Retired players are off future team sheets but not out of games they are
@@ -52,7 +112,9 @@ export function SetupScreen({ gameId }: { gameId: string }) {
     const valid = new Set(slotIds.split(','));
     setLineup((l) => {
       const next = Object.fromEntries(Object.entries(l).filter(([slot]) => valid.has(slot)));
-      return Object.keys(next).length === Object.keys(l).length ? l : next;
+      if (Object.keys(next).length === Object.keys(l).length) return l;
+      void persistLineup(next);
+      return next;
     });
   }, [slotIds]);
 
@@ -87,6 +149,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       const next = { ...prev };
       if (target.onBench) {
         if (from !== 'bench') delete next[from];
+        void persistLineup(next);
         return next;
       }
       if (!target.slotId) return prev;
@@ -94,19 +157,23 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       if (from === 'bench') {
         // Whoever was there goes back to the bench.
         next[target.slotId] = playerId;
+        void persistLineup(next);
         return next;
       }
       if (target.slotId === from) return prev;
       if (sitting) next[from] = sitting;
       else delete next[from];
       next[target.slotId] = playerId;
+      void persistLineup(next);
       return next;
     });
   };
 
   const { startDrag, ghost, dropSlotId, dragged } = usePitchDrag(onDrop);
 
-  if (!game) return <Screen title="Loading…">{null}</Screen>;
+  // Also covers the brief window before the redirect effect above actually
+  // navigates away for a non-'setup' game.
+  if (!game || game.status !== 'setup') return <Screen title="Loading…">{null}</Screen>;
 
   const formation = game.formation;
   const present = roster.filter((p) => !absent.has(p.id));
@@ -133,14 +200,14 @@ export function SetupScreen({ gameId }: { gameId: string }) {
       next[slot.id] = p.id;
     }
     setLineup(next);
+    void persistLineup(next);
   };
 
   const start = async () => {
-    const slots: PlayerSlot[] = formation.slots
-      .filter((s) => lineup[s.id])
-      .map((s) => ({ playerId: lineup[s.id] as string, position: s.code }));
-
-    await recordMany([{ type: 'SET_LINEUP' as const, slots }]);
+    // Already persisted incrementally as it was built — this just makes
+    // doubly sure the final shape is committed before flipping the game
+    // live, in case the very last edit's write is still in flight.
+    await persistLineup(lineup);
     await db.games.update(gameId, { status: 'live' });
     navigate({ name: 'live', gameId }, true);
   };
@@ -241,9 +308,11 @@ export function SetupScreen({ gameId }: { gameId: string }) {
               })),
             );
             // Anyone marked absent cannot stay in the starting lineup.
-            setLineup((l) =>
-              Object.fromEntries(Object.entries(l).filter(([, id]) => !nowAbsent.has(id))),
-            );
+            setLineup((l) => {
+              const next = Object.fromEntries(Object.entries(l).filter(([, id]) => !nowAbsent.has(id)));
+              if (Object.keys(next).length !== Object.keys(l).length) void persistLineup(next);
+              return next;
+            });
             setAttendance(false);
           }}
         />
@@ -269,7 +338,11 @@ export function SetupScreen({ gameId }: { gameId: string }) {
                   disabled={taken}
                   style={taken ? { opacity: 0.35 } : undefined}
                   onClick={() => {
-                    setLineup((l) => ({ ...l, [picking]: p.id }));
+                    setLineup((l) => {
+                      const next = { ...l, [picking]: p.id };
+                      void persistLineup(next);
+                      return next;
+                    });
                     setPicking(null);
                   }}
                 >
@@ -286,6 +359,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
                 setLineup((l) => {
                   const next = { ...l };
                   delete next[picking];
+                  void persistLineup(next);
                   return next;
                 });
                 setPicking(null);

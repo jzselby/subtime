@@ -116,6 +116,21 @@ function buildGame(
         }
         case 'pause': {
           b.pause(clock);
+          // Half the time, also fire an event while genuinely stopped —
+          // same clock position, not advanced — before resuming. This is
+          // the exact class of bug the field-time invariant used to miss
+          // entirely: an event stamped while the clock is stopped mid-game,
+          // not just pregame. eventClock() must ignore the event's own
+          // gameClockMs and use the frozen s.clockMs instead; miss that and
+          // playing time silently leaks or vanishes around every pause.
+          if (on.length > 0 && bench.length > 0 && op.b % 2 === 0) {
+            const off = on[op.a % on.length]!;
+            const inc = bench[op.b % bench.length]!;
+            const position = onField.get(off)!;
+            b.sub(clock, [off], [{ playerId: inc, position }]);
+            onField.delete(off);
+            onField.set(inc, position);
+          }
           b.resume();
           break;
         }
@@ -288,6 +303,42 @@ describe('field-time invariant', () => {
         expect(after.status).toBe('paused');
         expect(clockAt(after, pauseWall + waitMs)).toBe(pausedAt);
         expect(totalPlayedMs(after, pauseWall + waitMs)).toBe(totalPlayedMs(after, pauseWall));
+      }),
+      { numRuns: RUNS },
+    );
+  });
+
+  it('closes every open stint at the real clock when a game ends early', () => {
+    fc.assert(
+      fc.property(gameArb, fc.integer({ min: 0, max: 10 * MIN }), (spec, extraMs) => {
+        const { events, config } = buildGame(spec as GameSpec, { leaveLastPeriodOpen: true });
+        const { state } = reduce(events, config);
+        if (state.status !== 'running' || !state.anchor) return;
+
+        // GAME_END called mid-period, well before the period's own length —
+        // the coach ending a game early for weather, an injury pile-up, or
+        // a tournament running short.
+        const endAt = state.clockMs + extraMs;
+        const withEnd = [
+          ...events,
+          {
+            type: 'GAME_END' as const,
+            id: 'end',
+            gameId: state.gameId,
+            seq: state.lastSeq + 1,
+            wallTs: state.anchor.wallTs + (endAt - state.anchor.clockMs),
+            gameClockMs: endAt,
+            period: state.period,
+          },
+        ];
+        const { state: after, applied } = reduce(withEnd, config);
+
+        expect(after.status).toBe('final');
+        // Both sides must agree the stints closed at the real stopping
+        // clock, not the period's configured length — exactly what
+        // fieldTimeIntegralMs missed before it grouped GAME_END with
+        // PERIOD_END/CLOCK_PAUSE.
+        expect(totalPlayedMs(after, 0)).toBe(fieldTimeIntegralMs(applied));
       }),
       { numRuns: RUNS },
     );

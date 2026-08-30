@@ -339,7 +339,12 @@ function applyEvent(s: GameStateShape, e: GameEvent): string | null {
     }
   }
 
-  if (isRunning(s)) s.clockMs = e.gameClockMs;
+  // Same PERIOD_START exemption as the backwards-clock guard above: its own
+  // case already set s.clockMs to 0 for the new period, and e.gameClockMs
+  // here is whatever the *previous* period's clock last read — restamping
+  // from it would silently undo the reset and reject the period's first
+  // legitimate event as a backwards clock move.
+  if (isRunning(s) && e.type !== 'PERIOD_START') s.clockMs = e.gameClockMs;
   return null;
 }
 
