@@ -126,8 +126,16 @@ input,
   align-items: center;
   gap: 10px;
   padding: calc(env(safe-area-inset-top) + 10px) var(--pad) 10px;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(12px);
+  /* Solid, not translucent+blurred: `.top` and `main` are flex siblings
+     (see the Screen component), never overlapping, so there was never
+     anything scrolled behind this header for the blur to actually show —
+     just the phone's own status bar/notch sitting right above it, within
+     this element's own top padding. A translucent blur with nothing real
+     behind it reads as a faint, unintentional-looking fade right at the
+     top edge instead of a deliberate effect. .gamebar (the live-game
+     screen's equivalent header) already uses a plain solid background for
+     the same reason. */
+  background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
 
