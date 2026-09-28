@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Component, useEffect, useState } from 'react';
+import { saveBackup } from './backup';
 import { requestPersistence } from './db';
 import { useRoute } from './router';
 import { EventsScreen } from './screens/Events';
@@ -36,9 +38,62 @@ export function App() {
   return (
     <>
       <LandscapeGuard />
-      <AppScreen route={route} />
+      {/* Keyed by route so leaving the crashed screen clears the error. */}
+      <CrashScreen key={JSON.stringify(route)}>
+        <AppScreen route={route} />
+      </CrashScreen>
     </>
   );
+}
+
+/**
+ * Without this, one bad render anywhere is a blank screen with no way out —
+ * and no way to reach data that exists nowhere else. The backup button
+ * reads IndexedDB directly, so it works however broken the React tree is.
+ */
+class CrashScreen extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error(error);
+  }
+
+  render() {
+    const { error } = this.state;
+    if (!error) return this.props.children;
+    return (
+      <div className="app">
+        <header className="top">
+          <h1>Something went wrong</h1>
+        </header>
+        <main style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
+          <p>Your games are still saved on this phone. Reloading usually fixes this.</p>
+          <button className="btn primary block" onClick={() => location.reload()}>
+            Reload
+          </button>
+          <button
+            className="btn block"
+            onClick={() => {
+              location.hash = '';
+              location.reload();
+            }}
+          >
+            Go to the home screen
+          </button>
+          <button className="btn block" onClick={() => void saveBackup()}>
+            Save a backup of my data
+          </button>
+          <p className="small muted" style={{ wordBreak: 'break-word' }}>
+            {error.message}
+          </p>
+        </main>
+      </div>
+    );
+  }
 }
 
 /**

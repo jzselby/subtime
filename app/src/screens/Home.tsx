@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
-import { Screen, Sheet } from '../components';
+import { useRef, useState } from 'react';
+import { lastBackupAt, readBackup, restoreBackup, saveBackup } from '../backup';
+import { Screen, Sheet, useToast } from '../components';
 import { createTeam, db } from '../db';
 import { navigate } from '../router';
 
@@ -10,6 +11,51 @@ export function HomeScreen() {
   const [name, setName] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
   const [fieldPlayers, setFieldPlayers] = useState(9);
+
+  const { notify, toast } = useToast();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [lastBackup, setLastBackup] = useState(lastBackupAt);
+  const backupStale =
+    Boolean(teams?.length) && (!lastBackup || Date.now() - lastBackup > 14 * 24 * 3600_000);
+
+  const runBackup = async () => {
+    setBusy(true);
+    try {
+      if (await saveBackup()) {
+        setLastBackup(lastBackupAt());
+        notify('Backup saved');
+      }
+    } catch (err) {
+      alert(`Backup failed: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runRestore = async (file: File) => {
+    setBusy(true);
+    try {
+      const backup = await readBackup(file);
+      const when = new Date(backup.exportedAt).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      const ok = confirm(
+        `Restore the backup from ${when}? It has ${backup.teams.length} team(s) and ` +
+          `${backup.games.length} game(s).\n\nAnything in the backup replaces the same ` +
+          'record on this phone. Nothing that is only on this phone is deleted.',
+      );
+      if (!ok) return;
+      await restoreBackup(backup);
+      notify('Backup restored');
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async () => {
     if (!name.trim()) return;
@@ -49,6 +95,36 @@ export function HomeScreen() {
       <button className="btn primary block" onClick={() => setAdding(true)}>
         + New team
       </button>
+
+      <h2 style={{ marginTop: 18 }}>Backup</h2>
+      <button
+        className="btn block"
+        disabled={busy || !teams?.length}
+        onClick={() => void runBackup()}
+      >
+        Back up all data
+      </button>
+      <p className="small" style={{ marginTop: -4, color: backupStale ? 'var(--warn)' : 'var(--muted)' }}>
+        {lastBackup
+          ? `Last backup ${new Date(lastBackup).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.`
+          : 'No backup yet.'}{' '}
+        Everything lives only on this phone — save a copy to Files or iCloud Drive now and then.
+      </p>
+      <button className="btn ghost block" disabled={busy} onClick={() => fileInput.current?.click()}>
+        Restore from a backup…
+      </button>
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void runRestore(file);
+        }}
+      />
+      {toast}
 
       {adding && (
         <Sheet title="New team" onClose={() => setAdding(false)}>
