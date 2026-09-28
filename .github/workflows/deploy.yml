@@ -29,6 +29,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # Vite's build strips types without checking them, so without this a
+      # type error in the app or dashboard would deploy anyway.
+      - run: npm run typecheck
       # app first, so its PWA service-worker precache manifest (built from
       # app/dist's contents at build time) doesn't pick up dashboard/'s
       # files — they're copied in below, after this build finishes.
