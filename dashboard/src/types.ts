@@ -43,6 +43,13 @@ export interface DashboardSnapshot {
   players: DashboardPlayer[];
   games: DashboardGame[];
   events: DashboardEvent[];
+  /** Every current game's id, even when `games` is partial. Absent from a
+   *  server that predates incremental polling. */
+  game_ids?: string[];
+  /** Pass back as `since` on the next poll. Absent from an older server. */
+  as_of?: string;
+  /** True when `games`/`events` hold only games changed since `since`. */
+  partial?: boolean;
 }
 
 /** The exact shape `get_team_scoreboard()` returns — see

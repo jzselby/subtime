@@ -20,6 +20,7 @@ import { navigate } from '../router';
 import {
   dashboardConfigured,
   dashboardUrl,
+  describeSync,
   disableDashboard,
   enableDashboard,
   publishNow,
@@ -37,10 +38,15 @@ export function TeamScreen({ teamId }: { teamId: string }) {
     [teamId],
   );
 
+  const syncStatus = useLiveQuery(() => db.syncStatus.get(teamId), [teamId]);
+  const syncPending = useLiveQuery(async () => Boolean(await db.pendingSync.get(teamId)), [teamId]);
+
   const [sheet, setSheet] = useState<'player' | 'game' | 'pastGame' | 'settings' | null>(null);
   const [editing, setEditing] = useState<Player | null>(null);
 
   if (!team) return <Screen title="Loading…">{null}</Screen>;
+
+  const sync = team.dashboardEnabled ? describeSync(syncStatus, Boolean(syncPending)) : null;
 
   const byNumber = (a: Player, b: Player) =>
     (Number(a.number) || 999) - (Number(b.number) || 999) || a.name.localeCompare(b.name);
@@ -79,6 +85,13 @@ export function TeamScreen({ teamId }: { teamId: string }) {
         </button>
       }
     >
+      {/* Settings is where the detail lives, but nobody opens Settings to
+          find out the parents' score froze — so a failure surfaces here. */}
+      {sync?.tone === 'bad' && (
+        <button className="banner" onClick={() => setSheet('settings')}>
+          Parents’ live score isn’t updating. Tap for details.
+        </button>
+      )}
       <div className="row spread">
         <h2 style={{ margin: 0 }}>Games</h2>
         <button
@@ -432,6 +445,9 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
   // `justEnabled` only covers the gap before that reactive update
   // arrives, so the link appears the instant Enable resolves rather than
   // flickering "not yet enabled" for one render.
+  const syncStatus = useLiveQuery(() => db.syncStatus.get(team.id), [team.id]);
+  const syncPending = useLiveQuery(async () => Boolean(await db.pendingSync.get(team.id)), [team.id]);
+  const sync = team.dashboardEnabled ? describeSync(syncStatus, Boolean(syncPending)) : null;
   const [dashBusy, setDashBusy] = useState(false);
   const [dashError, setDashError] = useState<string | null>(null);
   const [dashCopied, setDashCopied] = useState(false);
@@ -553,11 +569,23 @@ function SettingsSheet({ team, onClose }: { team: Team; onClose: () => void }) {
                 <button
                   className="btn"
                   disabled={dashBusy}
-                  onClick={() => void runDashAction(() => publishNow(team))}
+                  onClick={() => void runDashAction(() => publishNow(team, { full: true }))}
                 >
-                  Publish now
+                  {dashBusy ? 'Publishing…' : 'Publish now'}
                 </button>
               </div>
+              {sync && (
+                <p
+                  className="small"
+                  data-sync={sync.tone}
+                  style={{
+                    marginTop: -6,
+                    color: sync.tone === 'bad' ? 'var(--danger)' : 'var(--muted)',
+                  }}
+                >
+                  {sync.text}
+                </p>
+              )}
               <p className="small muted" style={{ marginTop: -6, wordBreak: 'break-all' }}>
                 {shareUrl}
               </p>

@@ -1,151 +1,23 @@
--- Pitchside coaches dashboard: schema, RLS, and the two RPC functions that
--- are the only way in or out for the anon key. See DESIGN.md §4/§5/§7 and
--- the plan this implements for the reasoning; the short version is: no
--- coach login, so a per-team `share_token` gates reads (the dashboard URL)
--- and a separate `publish_key` gates writes (kept on the coach's device,
--- never shown). Direct table access is denied for anon; both keys only ever
--- go through get_team_dashboard() / publish_team_data() below.
+-- Migration for an existing Pitchside Supabase project (2026-09-28).
+-- Paste all of this into the Supabase SQL editor and run it once. Safe to
+-- re-run. A fresh project doesn't need it: schema.sql already includes it.
 --
--- Run this once, in order, in the Supabase SQL editor for a fresh project.
---
--- IDs are `text`, not `uuid`: local ids come from `uid()` in app/src/db.ts,
--- which is `crypto.randomUUID()` where available but falls back to a
--- non-UUID string (`id-<ts>-<rand>`) on browsers without it. A `uuid` column
--- would reject that fallback outright, so entity ids stay `text` throughout
--- — only `share_token`/`publish_key`, generated server-side, are real uuids.
+-- 1. Undo during a live game no longer freezes publishing. The
+--    (game_id, seq) uniqueness check now runs at commit, after the stale
+--    undone event has been removed. A team already stuck recovers on the
+--    app's next automatic retry.
+-- 2. A publish can no longer overwrite another team's games, players or
+--    events by reusing their ids.
+-- 3. Publishing and the coach dashboard only transfer games that changed.
+-- 4. Goal-scorer names on the parent scoreboard only resolve to this team's
+--    own players.
 
-create extension if not exists pgcrypto;
+alter table game_events drop constraint if exists game_events_game_id_seq_key;
+alter table game_events
+  add constraint game_events_game_id_seq_key unique (game_id, seq) deferrable initially deferred;
 
-create table teams (
-  id text primary key,
-  name text not null,
-  age_group text,
-  formation jsonb not null,
-  config jsonb not null,
-  dashboard_enabled boolean not null default false,
-  share_token uuid not null default gen_random_uuid(),
-  publish_key uuid not null default gen_random_uuid(),
-  -- The parent-facing scoreboard link (get_team_scoreboard below). Separate
-  -- from share_token on purpose: that one gates the *full* dashboard —
-  -- rosters, goals, playing time per player — and this one gates a link
-  -- meant to be handed out widely, which must never resolve to any of that.
-  -- Gated by the same dashboard_enabled flag as share_token; there is no
-  -- independent on/off switch for this one.
-  --
-  -- Nullable, unlike share_token/publish_key: a fresh team's INSERT always
-  -- supplies a real value (see publish_team_data's INSERT branch below), so
-  -- this only actually reads as null for a row that existed before this
-  -- column did — which is exactly what lets that UPDATE branch tell "never
-  -- assigned yet, adopt whatever the app sends" apart from "already has one,
-  -- never silently rotate it." A `not null default gen_random_uuid()` here
-  -- would hand a legacy row a value the app doesn't know and has never sent,
-  -- permanently rejecting the token it generates instead.
-  parent_share_token uuid,
-  updated_at timestamptz not null default now()
-);
+-- Everything below is copied verbatim from supabase/schema.sql.
 
-create table players (
-  id text primary key,
-  team_id text not null references teams(id) on delete cascade,
-  name text not null,
-  number text not null,
-  active smallint not null
-);
-
-create table games (
-  id text primary key,
-  team_id text not null references teams(id) on delete cascade,
-  opponent text,
-  kickoff_at timestamptz not null,
-  config jsonb not null,
-  formation jsonb not null,
-  status text not null,
-  -- 'fall' | 'spring' | 'tournament' | 'scrimmage', or null for untagged.
-  -- Not an enum: app/src/db.ts's GameTag is the source of truth for the
-  -- fixed set, and a text column needs no migration if that set ever grows.
-  tag text,
-  -- A pre-computed live summary, folded from the event log by the app's own
-  -- reduce() at publish time (see collectPayload in app/src/sync.ts) — the
-  -- same "one fold, many callers" reducer this whole engine is built on, not
-  -- a second implementation of the game-state machine in SQL. The point of
-  -- computing these here rather than in get_team_scoreboard below is data
-  -- minimization: the raw event log carries subs and position changes, which
-  -- is exactly the playing-time detail the parent scoreboard must never see
-  -- — so these columns are the *only* thing about a live game that function
-  -- is allowed to read, structurally, not just by convention.
-  score_us int not null default 0,
-  score_them int not null default 0,
-  -- The reducer's own finer state — 'pregame' | 'running' | 'paused' |
-  -- 'break' | 'final' — not the coarser games.status above, because a
-  -- scoreboard needs to tell "half-time" and "paused" apart from "final".
-  clock_status text not null default 'pregame',
-  clock_period int not null default 0,
-  -- Clock position (ms) as of the last applied event — frozen unless
-  -- clock_anchor is set.
-  clock_ms int not null default 0,
-  -- {wallTs, clockMs}, mirroring GameState['anchor'] exactly — present only
-  -- while clock_status = 'running', so a viewer can tick a live clock
-  -- between polls with the same clockAt() formula the app itself uses,
-  -- instead of only updating once every poll interval.
-  clock_anchor jsonb,
-  period_elapsed_ms jsonb not null default '[]',
-  -- GoalRecord[] minus eventId — scorerId/assistId only, not names. Bare ids
-  -- reveal nothing about playing time, so this is safe to store next to the
-  -- other summary fields; get_team_scoreboard resolves the names at read
-  -- time by joining players, which is also what keeps a renamed player's
-  -- past goals showing their current name.
-  goals jsonb not null default '[]',
-  updated_at timestamptz not null default now()
-);
-
-create table game_events (
-  id text primary key,
-  game_id text not null references games(id) on delete cascade,
-  seq int not null,
-  payload jsonb not null,
-  -- Deferred to commit, not checked row by row: Undo deletes the last event
-  -- and the next one recorded reuses its seq under a new id. The upsert in
-  -- publish_team_data inserts the new row *before* its deletion pass removes
-  -- the undone one, so an immediate check rejected every publish from then
-  -- on — permanently, since every retry carried the same pair.
-  constraint game_events_game_id_seq_key unique (game_id, seq) deferrable initially deferred
-);
-
-create index players_team_id_idx on players (team_id);
-create index games_team_id_idx on games (team_id);
-create index game_events_game_id_idx on game_events (game_id);
-
--- Default-deny: no policy is added for anon on any table, so `enable row
--- level security` with zero policies blocks every direct select/insert/
--- update/delete for that role. The two SECURITY DEFINER functions below
--- run as the table owner and bypass RLS entirely, which is what makes them
--- the only path in — the anon key alone grants nothing against these tables.
-alter table teams enable row level security;
-alter table players enable row level security;
-alter table games enable row level security;
-alter table game_events enable row level security;
-
--- ---------------------------------------------------------------------------
--- Reads: token in, a full team snapshot out.
--- ---------------------------------------------------------------------------
---
--- Never resolves a team with dashboard_enabled = false, so switching the
--- toggle off in the app actually revokes access rather than just hiding a
--- button — a coach who saved the link before disabling gets nothing back.
---
--- `since` makes polling incremental: with it, `games`/`events` hold only
--- games updated after that instant (a game's row is re-upserted whenever
--- anything in it changes, events included), and `game_ids` lists every
--- current game so the dashboard can drop deleted ones. Without it — the
--- first load — everything comes back, same as before. The dashboard passes
--- back the previous response's `as_of`, which is set a minute behind now():
--- now() is a transaction's *start* time, so a publish still committing
--- during this read stamps rows slightly in the past, and the overlap makes
--- sure the next poll still picks them up.
---
--- Dropped first because adding a parameter makes a new overload rather
--- than replacing the old one, and a call with just `token` would then be
--- ambiguous between the two.
 drop function if exists get_team_dashboard(uuid);
 
 create or replace function get_team_dashboard(token uuid, since timestamptz default null)

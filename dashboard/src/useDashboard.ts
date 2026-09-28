@@ -33,10 +33,20 @@ export function useDashboard(token: string | null): DashboardResult {
     const client = supabase;
 
     let cancelled = false;
+    let last: DashboardSnapshot | null = null;
+    let requested = 0;
+    let applied = 0;
 
     const load = async () => {
-      const { data, error } = await client.rpc('get_team_dashboard', { token });
-      if (cancelled) return;
+      const mine = ++requested;
+      // Only ask for changes once the server has shown it supports that
+      // (by returning as_of); an older server gets the plain call it knows.
+      const since = last?.as_of;
+      const { data, error } = await client.rpc(
+        'get_team_dashboard',
+        since ? { token, since } : { token },
+      );
+      if (cancelled || mine < applied) return;
       if (error) {
         setResult({ status: 'error', message: error.message });
         return;
@@ -45,7 +55,9 @@ export function useDashboard(token: string | null): DashboardResult {
         setResult({ status: 'error', message: 'No dashboard found for this link.' });
         return;
       }
-      setResult({ status: 'ready', snapshot: data as DashboardSnapshot });
+      applied = mine;
+      last = mergeSnapshot(last, data as DashboardSnapshot);
+      setResult({ status: 'ready', snapshot: last });
     };
 
     void load();
@@ -65,4 +77,25 @@ export function useDashboard(token: string | null): DashboardResult {
   }, [token]);
 
   return result;
+}
+
+/**
+ * Folds a poll's response into what's already loaded. A partial response
+ * carries only games changed since the last poll, each with its complete
+ * event log, so those replace the old copies wholesale; `game_ids` says
+ * which games still exist at all, so deleted ones drop out.
+ */
+export function mergeSnapshot(
+  prev: DashboardSnapshot | null,
+  next: DashboardSnapshot,
+): DashboardSnapshot {
+  if (!next.partial || !prev) return next;
+  const exists = new Set(next.game_ids ?? []);
+  const changed = new Set(next.games.map((g) => g.id));
+  const keep = (gameId: string) => exists.has(gameId) && !changed.has(gameId);
+  return {
+    ...next,
+    games: [...prev.games.filter((g) => keep(g.id)), ...next.games],
+    events: [...prev.events.filter((e) => keep(e.game_id)), ...next.events],
+  };
 }

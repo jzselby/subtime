@@ -1691,3 +1691,14 @@ body.sheet-open .actions {
   font-weight: 800;
   pointer-events: none;
 }
+
+button.banner {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}

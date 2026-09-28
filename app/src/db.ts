@@ -91,6 +91,26 @@ export interface Game {
 export interface PendingSyncRow {
   teamId: string;
   markedAt: number;
+  /** New on every mark, so a flush can tell whether the team was marked
+   *  again while its publish was in flight (see flushPendingSync). */
+  rev?: string;
+}
+
+/** Fingerprint of a game as last successfully published, so a publish can
+ *  skip games that haven't changed. Local bookkeeping only — no sync hooks. */
+export interface PublishedGameRow {
+  gameId: string;
+  teamId: string;
+  hash: string;
+}
+
+/** The outcome of a team's most recent publish attempts, for the status
+ *  line in Team settings. Local bookkeeping only — no sync hooks. */
+export interface SyncStatusRow {
+  teamId: string;
+  lastOkAt?: number;
+  lastErrorAt?: number;
+  lastError?: string;
 }
 
 export class PitchsideDb extends Dexie {
@@ -99,6 +119,8 @@ export class PitchsideDb extends Dexie {
   games!: EntityTable<Game, 'id'>;
   events!: EntityTable<GameEvent, 'id'>;
   pendingSync!: EntityTable<PendingSyncRow, 'teamId'>;
+  publishedGames!: EntityTable<PublishedGameRow, 'gameId'>;
+  syncStatus!: EntityTable<SyncStatusRow, 'teamId'>;
 
   constructor() {
     // The literal database name, not the class above it: an existing install's
@@ -148,6 +170,13 @@ export class PitchsideDb extends Dexie {
     this.version(3).stores({
       pendingSync: 'teamId',
     });
+
+    // v4: incremental publishing and a visible sync status. Both start
+    // empty, which just means the next publish sends every game once.
+    this.version(4).stores({
+      publishedGames: 'gameId, teamId',
+      syncStatus: 'teamId',
+    });
   }
 }
 
@@ -163,7 +192,7 @@ export const db = new PitchsideDb();
 export async function markDirty(teamId: string): Promise<void> {
   const team = await db.teams.get(teamId);
   if (!team?.dashboardEnabled) return;
-  await db.pendingSync.put({ teamId, markedAt: Date.now() });
+  await db.pendingSync.put({ teamId, markedAt: Date.now(), rev: uid() });
   // Lets sync.ts's flush loop react sooner than its next poll, without an
   // import cycle back into this module.
   window.dispatchEvent(new Event('pitchside:sync-dirty'));
@@ -198,7 +227,12 @@ db.teams.hook('deleting', function (primKey) {
   // Nothing left to resync for a deleted team — drop any queued publish
   // instead of marking it dirty again.
   this.onsuccess = () =>
-    Dexie.ignoreTransaction(() => void db.pendingSync.delete(String(primKey)));
+    Dexie.ignoreTransaction(() => {
+      const teamId = String(primKey);
+      void db.pendingSync.delete(teamId);
+      void db.syncStatus.delete(teamId);
+      void db.publishedGames.where('teamId').equals(teamId).delete();
+    });
 });
 
 db.players.hook('creating', function (_primKey, obj) {
