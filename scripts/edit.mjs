@@ -76,7 +76,7 @@ await page.waitForTimeout(300);
 
 await page.click('.token:not(.vacant) >> nth=0');
 await page.click('.benchgrid .bplayer >> nth=0');
-await page.click('text=/^Sub 1 ↔ 1$/');
+await page.click('.subbar >> text=/ on for /');
 await page.waitForTimeout(400);
 const onPitchAfterSub = await page.locator('.token:not(.vacant)').count();
 

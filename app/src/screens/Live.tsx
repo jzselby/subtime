@@ -12,6 +12,7 @@ import {
   periodTag,
   PlayerRow,
   Sheet,
+  shortNames,
   useToast,
 } from '../components';
 import { db, deleteGame } from '../db';
@@ -70,6 +71,10 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
     return (id: string) => map.get(id);
+  }, [players]);
+  const shortName = useMemo(() => {
+    const map = shortNames(players ?? []);
+    return (id: string) => map.get(id) ?? '?';
   }, [players]);
 
   // Keep the stored game status in step with the folded state, so the games
@@ -197,6 +202,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     occupants.set(slot.id, {
       playerId,
       name: p?.name ?? playerId,
+      shortName: shortName(playerId),
       number: p?.number ?? '',
       playedMs: stats.get(playerId)?.playedMs ?? 0,
       ...(deficitOf.has(playerId) ? { deficitMs: deficitOf.get(playerId) as number } : {}),
@@ -332,14 +338,12 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         ? 'Resume'
         : state.status === 'break'
           ? `Start ${periodTag(config.periods.count, state.period + 1)}`
-          : state.status === 'pregame'
-            ? 'Start'
-            : 'Full time';
+          : 'Start';
 
+  const undoTarget = undoable(events)[0];
   const undoLast = () => {
-    const last = events[events.length - 1];
-    const what = last ? describeEvent(last, nameOf) : '';
-    void undo().then(() => {
+    const what = undoTarget ? describeEvent(undoTarget, nameOf) : '';
+    void undo(undoable).then(() => {
       notify(what ? `Undid — ${what}` : 'Undone');
       confirmCue();
     });
@@ -364,9 +368,8 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     CLOCK_PAUSE: 'pause',
     CLOCK_RESUME: 'resume',
   };
-  const lastEvent = events[events.length - 1];
-  const undoLabel = lastEvent
-    ? `↩ Undo ${undoNoun[lastEvent.type] ?? lastEvent.type.toLowerCase()}`
+  const undoLabel = undoTarget
+    ? `↩ Undo ${undoNoun[undoTarget.type] ?? undoTarget.type.toLowerCase()}`
     : '↩ Undo';
 
   /*
@@ -379,18 +382,28 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const resultingOnField = state.onField.size - pickedOff.size + pickedOn.size;
   const wrongCount = resultingOnField !== config.periods.fieldPlayers;
   const listNames = (ids: Iterable<string>) => {
-    const all = [...ids].map((id) => nameOf(id)?.name ?? '?');
+    const all = [...ids].map(shortName);
     return all.length <= 2 ? all.join(' and ') : `${all.length} players`;
   };
+  /*
+   * A straight swap names both sides — "Sofia on for Chloe" is what the coach
+   * is about to shout, so the button can be checked against it before the tap.
+   * "Sub 1 ↔ 1" only confirmed the arithmetic.
+   */
   const subLabel =
     pickedOn.size === 0
       ? `Take ${listNames(pickedOff)} off — play ${resultingOnField}`
       : pickedOff.size === 0
         ? `Put ${listNames(pickedOn)} on — play ${resultingOnField}`
-        : `Sub ${pickedOff.size} ↔ ${pickedOn.size}${wrongCount ? ` — play ${resultingOnField}` : ''}`;
+        : `${listNames(pickedOn)} on for ${listNames(pickedOff)}${wrongCount ? ` — play ${resultingOnField}` : ''}`;
+
+  // The bench is already sorted most-owed first (see `fairness`), so its top
+  // two are who the fairness numbers say should go on next.
+  const nextUp = benchRows.slice(0, 2).map((r) => shortName(r.playerId));
+  const showNextUp = (inPeriod || state.status === 'break') && nextUp.length > 0;
 
   return (
-    <div className="app">
+    <div className="app live">
       {/* Clock and score live in one thin strip; transport moved to the bottom
           bar, in the thumb's reach, rather than sharing this row with it. */}
       <header className="gamebar">
@@ -489,7 +502,6 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             dropSlotId={dropSlotId}
           >
             <span className="fname">{formation.name}</span>
-            {shiftDue && <span className="shiftpill">Shift due</span>}
             {state.status === 'paused' && <span className="pausebadge">⏸ Paused</span>}
           </Pitch>
         </div>
@@ -539,6 +551,19 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         </div>
       )}
 
+      {/*
+        "Shift due" used to be a pill in the pitch's top corner — the hardest
+        spot to reach and to notice, sitting over the forwards' badges, and it
+        named nobody. It lives here now, right above the bench it's about, and
+        says who. Always present during play (not only when due), so the pitch
+        doesn't jump in size the moment the alarm goes off.
+      */}
+      {showNextUp && (
+        <div className={`nextup${shiftDue ? ' due' : ''}`}>
+          {shiftDue ? 'Shift due' : 'Next on'} · {nextUp.join(', ')}
+        </div>
+      )}
+
       {view === 'field' && (
         <div className="benchgrid" data-bench>
           {benchRows.length === 0 ? (
@@ -560,7 +585,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                   <span className="shirt" style={{ borderColor: heatColor(row.deficitMs) }}>
                     {p?.number || (p ? initials(p.name) : '?')}
                   </span>
-                  <span className="tname">{p?.name ?? row.playerId}</span>
+                  <span className="tname">{shortName(row.playerId)}</span>
                   <span className="ttime">{mmss(stats.get(row.playerId)?.playedMs ?? 0)}</span>
                 </button>
               );
@@ -602,15 +627,22 @@ export function LiveScreen({ gameId }: { gameId: string }) {
            * produces. They live here now, full-sized, with real separation.
            */}
           <div className="transport-row">
-            <button
-              className={`tplay${running ? ' running' : state.status === 'paused' ? ' paused' : ''}`}
-              onClick={transport}
-              disabled={!canPlay}
-              aria-label={running ? 'Pause clock' : 'Start clock'}
-            >
-              <span className="ticon">{running ? '❚❚' : '▶'}</span>
-              {transportLabel}
-            </button>
+            {canPlay ? (
+              <button
+                className={`tplay${running ? ' running' : state.status === 'paused' ? ' paused' : ''}`}
+                onClick={transport}
+                aria-label={running ? 'Pause clock' : 'Start clock'}
+              >
+                <span className="ticon">{running ? '❚❚' : '▶'}</span>
+                {transportLabel}
+              </button>
+            ) : (
+              // Full time used to leave a greyed-out "Full time" here with
+              // nowhere to go but the header's small Stats button.
+              <button className="tplay done" onClick={() => navigate({ name: 'summary', gameId })}>
+                Full time · See summary ›
+              </button>
+            )}
             {/* A hold cannot be produced by the mis-tap that a native confirm()
                 dialog was defenseless against, so the fill itself is the guard —
                 nothing else is needed next to the button that pauses the clock. */}
@@ -625,17 +657,24 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             </HoldButton>
           </div>
           <div className="transport-row2">
-            <button className="btn" onClick={() => setSheet('goal')} disabled={state.period === 0}>
+            {/* Not after full time: the engine rejects a goal in a final game,
+                and tapping one left an error banner, an "Opponent scored" toast
+                for a score that never changed, and Undo pointing at it. */}
+            <button
+              className="btn"
+              onClick={() => setSheet('goal')}
+              disabled={state.period === 0 || !canPlay}
+            >
               ⚽ Us
             </button>
             <button
               className="btn"
               onClick={() => void record({ type: 'OPPONENT_GOAL' })}
-              disabled={state.period === 0}
+              disabled={state.period === 0 || !canPlay}
             >
               ⚽ Them
             </button>
-            <button className="btn" onClick={undoLast} disabled={events.length === 0}>
+            <button className="btn" onClick={undoLast} disabled={!undoTarget}>
               {undoLabel}
             </button>
           </div>
@@ -819,6 +858,24 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       )}
     </div>
   );
+}
+
+const CLOCK_STOPS: GameEvent['type'][] = ['CLOCK_PAUSE', 'CLOCK_RESUME'];
+
+/**
+ * What Undo takes back: the latest thing the coach *did*, stepping over
+ * pauses and resumes. Those have their own reverse — the Pause button — and
+ * with them in the way, Undo read "Undo resume" after nearly every stoppage,
+ * pushing the goal a coach actually meant to take back one tap further off
+ * (and quietly stopping the clock if tapped). A period start takes its own
+ * pauses with it: left behind, they'd be pauses in a period that never began.
+ */
+function undoable(log: GameEvent[]): GameEvent[] {
+  let i = log.length - 1;
+  while (i >= 0 && CLOCK_STOPS.includes(log[i]!.type)) i--;
+  if (i < 0) return [];
+  const target = log[i]!;
+  return target.type === 'PERIOD_START' ? log.slice(i) : [target];
 }
 
 function GoalSheet({

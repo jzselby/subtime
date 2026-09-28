@@ -97,8 +97,10 @@ check('the roster shows the corrected number', await page.locator('.num-badge:ha
 // -- the correction reaches a game recorded before the fix -------------------
 await page.click('text=vs Rivals');
 await page.waitForSelector('.pitch');
+// The pitch prints first names only (shortNames), so the corrected first
+// name is what should show — and nothing of the old one.
 const pitchNames = await page.locator('.token').allInnerTexts();
-check('the game screen reads the corrected name too', pitchNames.some((t) => t.includes('Corrected Name')), true);
+check('the game screen reads the corrected name too', pitchNames.some((t) => t.includes('Corrected')), true);
 check('not the stale one', pitchNames.some((t) => t.includes('Mistyped')), false);
 
 // -- Remove does not also open the editor ------------------------------------

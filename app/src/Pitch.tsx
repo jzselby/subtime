@@ -14,6 +14,8 @@ import type { Formation, Slot } from './formations';
 export interface Occupant {
   playerId: string;
   name: string;
+  /** What's printed under the shirt — see shortNames. Falls back to `name`. */
+  shortName?: string;
   number: string;
   playedMs: number;
   deficitMs?: number;
@@ -180,7 +182,7 @@ export function Pitch({
             data-slot={slot.id}
             className={`token${occupant ? '' : ' vacant'}${isSelected ? ' picked' : ''}${
               dragging === slot.id ? ' dragging' : ''
-            }${dropSlotId === slot.id ? ' drop' : ''}`}
+            }${dropSlotId === slot.id ? ' drop' : ''}${slot.y < 0.2 ? ' hi' : ''}`}
             style={{ left: `${slot.x * 100}%`, top: `${slot.y * 100}%` }}
             onPointerDown={onPointerDown(slot, occupant)}
             onPointerMove={onPointerMove(slot)}
@@ -203,7 +205,7 @@ export function Pitch({
               {occupant ? occupant.number || initials(occupant.name) : '+'}
             </span>
             {occupant ? (
-              <span className="tname">{occupant.name}</span>
+              <span className="tname">{occupant.shortName ?? occupant.name}</span>
             ) : (
               // Empty slot reads as a team sheet entry: "ST · F". The keeper's
               // code and role are both literally "GK", so pairing them would

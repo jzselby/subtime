@@ -70,7 +70,7 @@ export function LogPastGameSheet({
   return (
     <Sheet title="Log a past game" onClose={onClose}>
       <div style={{ display: 'grid', gap: 12 }}>
-        <p className="small muted" style={{ marginTop: -4 }}>
+        <p className="small muted">
           For a game this app wasn't running for. No playing time comes out of
           this — just the final score, and who scored or assisted.
         </p>
@@ -207,7 +207,7 @@ function PastGoalSheet({
     return (
       <Sheet title="Who scored?" onClose={onClose}>
         {pool.length === 0 && (
-          <p className="small muted" style={{ marginTop: -4 }}>
+          <p className="small muted">
             Nobody is marked as having played yet — tick them under "Who
             played" first, or record this one as unknown.
           </p>

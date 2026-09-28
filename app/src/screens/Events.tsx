@@ -94,7 +94,7 @@ export function EventsScreen({ gameId }: { gameId: string }) {
 
       <div className="plist">
         {shown.map((e) => (
-          <button key={e.id} className="prow" onClick={() => setEditing(e)}>
+          <button key={e.id} className="prow evrow" onClick={() => setEditing(e)}>
             <span className="evtime">
               {periodTag(config.periods.count, e.period)} {formatClock(e.gameClockMs)}
             </span>

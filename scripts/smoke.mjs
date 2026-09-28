@@ -205,13 +205,13 @@ check('an uneven sub is styled as a warning, not primary', await page.locator('.
 
 await page.click('.benchgrid .bplayer >> nth=0');
 check(
-  'picking a replacement returns to a plain swap label',
-  await page.locator('text=/^Sub 1 ↔ 1$/').count(),
-  1,
+  'picking a replacement names both players, the way the coach will say it',
+  (await page.locator('.subbar .btn.grow').innerText()).startsWith(`${benchName} on for `),
+  true,
 );
 check('a straight swap is not styled as a warning', await page.locator('.subbar .warn').count(), 0);
 await shot(page, 'live-sub-pending');
-await page.click('text=/^Sub 1 ↔ 1$/');
+await page.click('.subbar >> text=/ on for /');
 await page.waitForTimeout(400);
 
 const onPitch = await page.locator('.token:not(.vacant) .tname').allInnerTexts();
@@ -299,7 +299,7 @@ await page.waitForTimeout(1500);
 // A second sub in the second half, so the timeline has something to show.
 await page.click('.token:not(.vacant) >> nth=0');
 await page.click('.benchgrid .bplayer >> nth=0');
-await page.click('text=/^Sub 1 ↔ 1$/');
+await page.click('.subbar >> text=/ on for /');
 await page.waitForTimeout(1200);
 
 await page.click('[aria-label="More"]');

@@ -114,7 +114,9 @@ await page.click('text=Save formation');
 await page.waitForSelector('text=Roster · 0');
 await page.click('text=Settings');
 await page.click('text=/^Formation: /');
-await page.waitForSelector('text=Shape');
+// Wait for the shirts themselves: "text=Shape" also matches "shape" in the
+// closing Settings sheet, so it could resolve before the editor rendered.
+await page.waitForSelector('.pitch .token');
 check('the custom shape survived a reload of the editor', await page.locator('.token').count(), before + 1);
 
 await browser.close();

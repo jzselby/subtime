@@ -174,6 +174,33 @@ export function Sheet({
 export const mmss = (ms: number): string => formatClock(Math.max(0, ms));
 
 /**
+ * What the sideline actually calls each player: the first name, plus a last
+ * initial only where two players share a first name, and the full name only
+ * if even that collides. Pitch tokens and the bench are too narrow for full
+ * names — "Isla McAllis…" was the result — and nobody shouts surnames.
+ */
+export function shortNames(players: { id: string; name: string }[]): Map<string, string> {
+  const parts = players.map((p) => ({ id: p.id, full: p.name.trim(), words: p.name.trim().split(/\s+/) }));
+  const count = (key: (w: string[]) => string) => {
+    const m = new Map<string, number>();
+    for (const p of parts) m.set(key(p.words).toLowerCase(), (m.get(key(p.words).toLowerCase()) ?? 0) + 1);
+    return m;
+  };
+  const first = (w: string[]) => w[0] ?? '';
+  const firstInitial = (w: string[]) =>
+    w.length > 1 ? `${w[0]} ${(w[w.length - 1] ?? '').charAt(0)}.` : (w[0] ?? '');
+  const firsts = count(first);
+  const initials = count(firstInitial);
+  const out = new Map<string, string>();
+  for (const p of parts) {
+    if ((firsts.get(first(p.words).toLowerCase()) ?? 0) <= 1) out.set(p.id, first(p.words) || p.full);
+    else if ((initials.get(firstInitial(p.words).toLowerCase()) ?? 0) <= 1) out.set(p.id, firstInitial(p.words));
+    else out.set(p.id, p.full);
+  }
+  return out;
+}
+
+/**
  * Short label for a period: 1H/2H for halves, Q1..Q4 for quarters, else P1..
  *
  * The clock reads per-period and this sits beside it. That pairing is what

@@ -1,7 +1,7 @@
 import type { PlayerSlot } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { initials, minutesOf, Screen, Sheet } from '../components';
+import { initials, minutesOf, Screen, Sheet, shortNames } from '../components';
 import { db, deleteGame, GAME_TAG_LABELS, type Game, type GameTag, type Player } from '../db';
 import { useGameLog } from '../hooks';
 import type { Occupant } from '../Pitch';
@@ -181,11 +181,20 @@ export function SetupScreen({ gameId }: { gameId: string }) {
   const filled = Object.values(lineup).filter(Boolean).length;
   const needed = Math.min(formation.slots.length, present.length);
   const byId = new Map(roster.map((p) => [p.id, p]));
+  const short = shortNames(roster);
 
   const occupants = new Map<string, Occupant>();
   for (const [slotId, playerId] of Object.entries(lineup)) {
     const p = byId.get(playerId);
-    if (p) occupants.set(slotId, { playerId, name: p.name, number: p.number, playedMs: 0 });
+    if (p) {
+      occupants.set(slotId, {
+        playerId,
+        name: p.name,
+        shortName: short.get(p.id),
+        number: p.number,
+        playedMs: 0,
+      });
+    }
   }
 
 
@@ -280,7 +289,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
               onPointerDown={startDrag(p.id, 'bench', p.number || initials(p.name))}
             >
               <span className="shirt">{p.number || initials(p.name)}</span>
-              <span className="tname">{p.name}</span>
+              <span className="tname">{short.get(p.id) ?? p.name}</span>
             </button>
           ))}
         {present.length === filled && (
@@ -402,7 +411,7 @@ function AttendanceSheet({
 
   return (
     <Sheet title={`Who's here? · ${here} of ${roster.length}`} onClose={onClose}>
-      <p className="small muted" style={{ marginTop: -4 }}>
+      <p className="small muted">
         Everyone starts ticked. Untick anyone who is not at this game.
       </p>
       <div className="plist" style={{ marginTop: 10 }}>

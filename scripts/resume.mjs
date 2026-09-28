@@ -118,7 +118,7 @@ check(
 // And it must still be substitutable, not just readable.
 await fresh.click('.token:not(.vacant) >> nth=0');
 await fresh.click('.benchgrid .bplayer >> nth=0');
-await fresh.click('text=/^Sub 1 ↔ 1$/');
+await fresh.click('.subbar >> text=/ on for /');
 await fresh.waitForTimeout(400);
 check(
   'still 5 on the pitch after a resumed sub',

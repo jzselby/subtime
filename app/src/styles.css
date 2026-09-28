@@ -1020,6 +1020,16 @@ body.sheet-open .actions {
   white-space: nowrap;
 }
 
+/* The front line has no headroom above its shirts — on a small phone the
+   badge ran into the pitch's top edge — so there it sits beside the shirt. */
+.token.hi .tstint {
+  bottom: auto;
+  top: 0;
+  left: calc(50% + min(23px, 7.5cqh) + 3px);
+  transform: none;
+  margin: 0;
+}
+
 /* Same cramped-pitch fallback as .tname just below: a short pitch has no
    headroom above the top row's shirts either, so this drops rather than
    getting clipped by .pitch's own overflow: hidden. */
@@ -1336,11 +1346,14 @@ body.sheet-open .actions {
   padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
 }
 
-/* Formation name, top-left of the pitch like a team sheet caption. */
+/* Formation name, bottom-left like a team sheet caption. Not the top: that's
+   where the forwards' time-in-shift badges float, and the two collided. The
+   bottom corners stay clear — the keeper is central and the back line sits
+   well above them. */
 .fname {
   position: absolute;
   left: 8px;
-  top: 8px;
+  bottom: 8px;
   z-index: 3;
   padding: 3px 8px;
   border-radius: 6px;
@@ -1352,17 +1365,25 @@ body.sheet-open .actions {
   font-variant-numeric: tabular-nums;
 }
 
-.shiftpill {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  z-index: 3;
-  padding: 3px 9px;
-  border-radius: 999px;
+/* Right above the bench it's about: who the fairness numbers say goes on
+   next, turning amber when a shift is due. */
+.nextup {
+  flex: none;
+  padding: 5px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nextup.due {
   background: var(--warn);
+  border-top-color: var(--warn);
   color: #2a1c02;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 /* --------------------------------------------------------- drag to sub -- */
@@ -1444,6 +1465,12 @@ body.sheet-open .actions {
 }
 
 /* Event-log rows: clock on the left, so the list scans as a timeline. */
+/* An audit log: show the whole sentence rather than clip it. */
+.evrow .name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .evtime {
   flex: none;
   width: 66px;
@@ -1532,6 +1559,11 @@ body.sheet-open .actions {
 
 .tplay:disabled {
   opacity: 0.4;
+}
+
+.tplay.done {
+  background: var(--accent);
+  color: #06231a;
 }
 
 /*
@@ -1637,6 +1669,14 @@ body.sheet-open .actions {
   padding: 0 var(--pad);
 }
 
+/* On the game screen the bottom is the bench — exactly what a coach needs to
+   see after a period ends or a goal goes in — so messages drop in from just
+   under the clock instead. */
+.app.live .toastwrap {
+  top: calc(env(safe-area-inset-top) + 66px);
+  bottom: auto;
+}
+
 .toast {
   max-width: 100%;
   padding: 9px 16px;
@@ -1678,11 +1718,11 @@ body.sheet-open .actions {
 }
 
 .pausebadge {
+  /* Bottom-right, mirroring .fname — top-centre covered the striker. */
   position: absolute;
-  left: 50%;
-  top: 8px;
+  right: 8px;
+  bottom: 8px;
   z-index: 3;
-  transform: translateX(-50%);
   padding: 3px 10px;
   border-radius: 999px;
   background: var(--warn);

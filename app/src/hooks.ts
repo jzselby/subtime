@@ -73,7 +73,7 @@ export interface UseGameLog extends ReduceResult {
   /** Append several events in one transaction, each folded onto the last. */
   recordMany: (inputs: EventInput[], wallTs?: number) => Promise<void>;
   /** Drop the most recent event. The event log makes undo this cheap. */
-  undo: () => Promise<void>;
+  undo: (pick?: (log: GameEvent[]) => GameEvent[]) => Promise<void>;
 }
 
 /**
@@ -155,16 +155,20 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
     [recordMany],
   );
 
-  const undo = useCallback(async () => {
+  const undo = useCallback(async (pick?: (log: GameEvent[]) => GameEvent[]) => {
     if (!gameId) return;
     pendingWrites.current += 1;
     try {
+      // Chosen from the log as stored at the moment of the write, not the
+      // render the button was drawn from, so two quick taps take back two
+      // different things rather than both aiming at the same one.
       await db.transaction('rw', db.events, async () => {
-        const last = await db.events
+        const log = await db.events
           .where('[gameId+seq]')
           .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
-          .last();
-        if (last) await db.events.delete(last.id);
+          .toArray();
+        const doomed = pick ? pick(log) : log.slice(-1);
+        if (doomed.length) await db.events.bulkDelete(doomed.map((e) => e.id));
       });
     } finally {
       pendingWrites.current -= 1;

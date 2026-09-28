@@ -133,15 +133,15 @@ console.log(JSON.stringify(measured, null, 1));
 
 // shift alarm: 2-min halves -> shiftMs 60s
 console.log('waiting for the shift alarm…');
-await p.waitForSelector('.shiftpill', { timeout: 90000 }).catch(() => console.log('NO SHIFT PILL'));
+await p.waitForSelector('.nextup.due', { timeout: 90000 }).catch(() => console.log('NO SHIFT-DUE BAR'));
 await shot('43-shift-due');
 const pill = await p.evaluate(() => {
-  const e = document.querySelector('.shiftpill');
+  const e = document.querySelector('.nextup.due');
   if (!e) return null;
   const r = e.getBoundingClientRect();
   return { text: e.textContent, w: +r.width.toFixed(1), h: +r.height.toFixed(1), fs: getComputedStyle(e).fontSize };
 });
-console.log('shiftpill', JSON.stringify(pill));
+console.log('shift-due bar', JSON.stringify(pill));
 
 // what happens when the period clock runs past its configured length
 await p.waitForTimeout(40000);

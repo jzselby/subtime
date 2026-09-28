@@ -103,7 +103,7 @@ for (const [tag, w, h] of DEVICES) {
   await shot('15-sub-onepicked');
   await p.click('.benchgrid .bplayer >> nth=0');
   await shot('16-sub-pending');
-  await p.click('text=/^Sub 1 ↔ 1$/');
+  await p.click('.subbar >> text=/ on for /');
   await p.waitForTimeout(500);
   await shot('17-after-sub');
 
@@ -153,7 +153,7 @@ for (const [tag, w, h] of DEVICES) {
   await p.waitForTimeout(1500);
   await p.click('.token:not(.vacant) >> nth=2');
   await p.click('.benchgrid .bplayer >> nth=0');
-  await p.click('text=/^Sub 1 ↔ 1$/');
+  await p.click('.subbar >> text=/ on for /');
   await p.waitForTimeout(1400);
   await p.click('[aria-label="More"]');
   await p.click('.sheet >> text=End 2H', { delay: 800 });
