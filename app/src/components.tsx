@@ -79,7 +79,20 @@ let openSheets = 0;
  * document's.
  */
 function useKeyboardSafeViewport(): { top: number; height: number } | undefined {
-  const read = (vv: VisualViewport) => ({ top: vv.offsetTop, height: vv.height });
+  /*
+   * Only while a text field actually has focus. Applied unconditionally, a
+   * sheet with no input at all — "Who scored?" — was positioned from
+   * whatever iOS reported for the visual viewport, and on a phone reporting
+   * an offset it opened below the bottom of the screen: the action bar hid
+   * (as it does for any open sheet) and nothing appeared, mid-game. With no
+   * keyboard there is nothing to dodge, so the CSS `inset: 0` is the answer.
+   */
+  const read = (vv: VisualViewport) => {
+    const el = document.activeElement as HTMLElement | null;
+    const typing =
+      !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    return typing ? { top: vv.offsetTop, height: vv.height } : undefined;
+  };
   const [viewport, setViewport] = useState<{ top: number; height: number } | undefined>(() => {
     const vv = window.visualViewport;
     return vv ? read(vv) : undefined;
@@ -92,9 +105,13 @@ function useKeyboardSafeViewport(): { top: number; height: number } | undefined 
     update();
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', update);
     return () => {
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
+      document.removeEventListener('focusin', update);
+      document.removeEventListener('focusout', update);
     };
   }, []);
 
