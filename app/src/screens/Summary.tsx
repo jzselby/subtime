@@ -113,7 +113,17 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
    * the final whistle (projected, while a game is still going) — relative, so
    * routine sub timing in a long game doesn't paint half the team amber.
    */
-  const fairRows = new Map(fairness(state, now).map((r) => [r.playerId, r]));
+  // A finished game's fair share is of the time actually played: a game cut
+  // short (weather, injuries) otherwise left everyone "short" of a target
+  // built from the full scheduled length.
+  const scheduledMs = config.periods.count * config.periods.lengthMs;
+  const playedScale = state.status === 'final' && scheduledMs > 0 ? elapsed / scheduledMs : 1;
+  const fairRows = new Map(
+    fairness(state, now).map((r) => {
+      const targetMs = r.targetMs * playedScale;
+      return [r.playerId, { targetMs, deficitMs: targetMs - r.projectedMs }];
+    }),
+  );
   const isShort = (r?: { targetMs: number; deficitMs: number }) =>
     !!r && r.targetMs > 0 && r.deficitMs > r.targetMs * 0.1;
   const maxMs = Math.max(

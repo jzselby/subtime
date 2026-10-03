@@ -65,6 +65,13 @@ export function useWakeLock(active: boolean): void {
   }, [active]);
 }
 
+/** What an undo does to the log: events to drop, and events to rewrite in
+ *  place (same id and seq, so the log's order is untouched). */
+export interface UndoPlan {
+  remove: GameEvent[];
+  put?: GameEvent[];
+}
+
 export interface UseGameLog extends ReduceResult {
   events: GameEvent[];
   loading: boolean;
@@ -73,7 +80,7 @@ export interface UseGameLog extends ReduceResult {
   /** Append several events in one transaction, each folded onto the last. */
   recordMany: (inputs: EventInput[], wallTs?: number) => Promise<void>;
   /** Drop the most recent event. The event log makes undo this cheap. */
-  undo: (pick?: (log: GameEvent[]) => GameEvent[]) => Promise<void>;
+  undo: (pick?: (log: GameEvent[]) => UndoPlan) => Promise<void>;
 }
 
 /**
@@ -155,7 +162,7 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
     [recordMany],
   );
 
-  const undo = useCallback(async (pick?: (log: GameEvent[]) => GameEvent[]) => {
+  const undo = useCallback(async (pick?: (log: GameEvent[]) => UndoPlan) => {
     if (!gameId) return;
     pendingWrites.current += 1;
     try {
@@ -167,8 +174,9 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
           .where('[gameId+seq]')
           .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
           .toArray();
-        const doomed = pick ? pick(log) : log.slice(-1);
-        if (doomed.length) await db.events.bulkDelete(doomed.map((e) => e.id));
+        const plan: UndoPlan = pick ? pick(log) : { remove: log.slice(-1) };
+        if (plan.remove.length) await db.events.bulkDelete(plan.remove.map((e) => e.id));
+        if (plan.put?.length) await db.events.bulkPut(plan.put);
       });
     } finally {
       pendingWrites.current -= 1;

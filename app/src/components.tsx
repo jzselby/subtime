@@ -87,11 +87,20 @@ function useKeyboardSafeViewport(): { top: number; height: number } | undefined 
    * (as it does for any open sheet) and nothing appeared, mid-game. With no
    * keyboard there is nothing to dodge, so the CSS `inset: 0` is the answer.
    */
+  /*
+   * Once engaged by a focused field it stays engaged until the keyboard has
+   * actually gone (the visual viewport is back to full height), not the
+   * moment focus leaves the field: tapping "Add" moves focus to the button
+   * first, and dropping the adjustment right then slid the sheet ~330px down
+   * mid-tap so the click landed on the backdrop and closed it unsaved.
+   */
+  const engaged = useRef(false);
   const read = (vv: VisualViewport) => {
     const el = document.activeElement as HTMLElement | null;
     const typing =
       !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-    return typing ? { top: vv.offsetTop, height: vv.height } : undefined;
+    engaged.current = typing || (engaged.current && vv.height < window.innerHeight - 1);
+    return engaged.current ? { top: vv.offsetTop, height: vv.height } : undefined;
   };
   const [viewport, setViewport] = useState<{ top: number; height: number } | undefined>(() => {
     const vv = window.visualViewport;
@@ -106,12 +115,10 @@ function useKeyboardSafeViewport(): { top: number; height: number } | undefined 
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
     document.addEventListener('focusin', update);
-    document.addEventListener('focusout', update);
     return () => {
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
       document.removeEventListener('focusin', update);
-      document.removeEventListener('focusout', update);
     };
   }, []);
 
@@ -135,6 +142,15 @@ export function Sheet({
   }, [onClose]);
 
   const keyboardSafeViewport = useKeyboardSafeViewport();
+
+  /*
+   * Only a press that *starts* on the backdrop closes the sheet. A sheet
+   * opened on finger-lift (tapping an empty position on the pitch) used to
+   * receive that same tap's click a moment later on its brand-new backdrop
+   * and close instantly; so did a click that landed there after the layout
+   * shifted under a finger that went down on a button inside the sheet.
+   */
+  const pressedBackdrop = useRef(false);
 
   useEffect(() => {
     openSheets += 1;
@@ -169,7 +185,13 @@ export function Sheet({
           ? { top: keyboardSafeViewport.top, height: keyboardSafeViewport.height }
           : undefined
       }
-      onClick={onClose}
+      onPointerDown={(e) => {
+        pressedBackdrop.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && pressedBackdrop.current) onClose();
+        pressedBackdrop.current = false;
+      }}
       role="dialog"
       aria-modal="true"
       aria-label={title}

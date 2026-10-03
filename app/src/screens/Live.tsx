@@ -1,5 +1,5 @@
-import type { GameEvent, PlayerSlot } from '@pitchside/core';
-import { clockAt, currentRotationMs, fairness, formatClock, playerStats } from '@pitchside/core';
+import type { GameConfig, GameEvent, PlayerSlot } from '@pitchside/core';
+import { clockAt, currentRotationMs, fairness, formatClock, playerStats, reduce } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -18,7 +18,7 @@ import {
 import { db, deleteGame } from '../db';
 import { describeEvent } from '../describe';
 import { codesOf } from '../formations';
-import type { EventInput } from '../hooks';
+import type { EventInput, UndoPlan } from '../hooks';
 import { useGameLog, useNow, useWakeLock } from '../hooks';
 import type { DropTarget } from '../usePitchDrag';
 import { usePitchDrag } from '../usePitchDrag';
@@ -346,10 +346,18 @@ export function LiveScreen({ gameId }: { gameId: string }) {
           ? `Start ${periodTag(config.periods.count, state.period + 1)}`
           : 'Start';
 
-  const undoTarget = undoable(events)[0];
+  const plan = undoPlan(events, config, gameId);
+  const undoTarget = plan.remove[0] ?? plan.put?.[0];
+  const undoTargetOriginal = undoTarget && events.find((e) => e.id === undoTarget.id);
   const undoLast = () => {
-    const what = undoTarget ? describeEvent(undoTarget, nameOf) : '';
-    void undo(undoable).then(() => {
+    const what = undoTargetOriginal ? describeEvent(undoTargetOriginal, nameOf) : '';
+    const reopened = !!plan.put?.length;
+    void undo((log) => undoPlan(log, config, gameId)).then(() => {
+      if (reopened) {
+        notify('Reopened — clock stopped. Start it when play restarts.');
+        confirmCue();
+        return;
+      }
       notify(what ? `Undid — ${what}` : 'Undone');
       confirmCue();
     });
@@ -374,8 +382,8 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     CLOCK_PAUSE: 'pause',
     CLOCK_RESUME: 'resume',
   };
-  const undoLabel = undoTarget
-    ? `↩ Undo ${undoNoun[undoTarget.type] ?? undoTarget.type.toLowerCase()}`
+  const undoLabel = undoTargetOriginal
+    ? `↩ Undo ${undoNoun[undoTargetOriginal.type] ?? undoTargetOriginal.type.toLowerCase()}`
     : '↩ Undo';
 
   /*
@@ -866,6 +874,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
 }
 
 const CLOCK_STOPS: GameEvent['type'][] = ['CLOCK_PAUSE', 'CLOCK_RESUME'];
+const WHISTLES: GameEvent['type'][] = ['PERIOD_END', 'GAME_END'];
 
 /**
  * What Undo takes back: the latest thing the coach *did*, stepping over
@@ -874,13 +883,29 @@ const CLOCK_STOPS: GameEvent['type'][] = ['CLOCK_PAUSE', 'CLOCK_RESUME'];
  * pushing the goal a coach actually meant to take back one tap further off
  * (and quietly stopping the clock if tapped). A period start takes its own
  * pauses with it: left behind, they'd be pauses in a period that never began.
+ *
+ * A whistle (end of a period, or of the game) is not deleted but turned into
+ * a clock stop at the same instant. Deleting it left the period running from
+ * that moment, so a half-time undo five minutes later jumped the clock five
+ * minutes and credited everyone on the field with the break. As a stop, the
+ * period reopens frozen where it ended; the coach restarts it when play does.
+ * If the clock was already stopped when the whistle went, there is nothing
+ * to freeze, so it's simply removed.
  */
-function undoable(log: GameEvent[]): GameEvent[] {
+function undoPlan(log: GameEvent[], config: GameConfig, gameId: string): UndoPlan {
   let i = log.length - 1;
   while (i >= 0 && CLOCK_STOPS.includes(log[i]!.type)) i--;
-  if (i < 0) return [];
+  if (i < 0) return { remove: [] };
   const target = log[i]!;
-  return target.type === 'PERIOD_START' ? log.slice(i) : [target];
+  if (target.type === 'PERIOD_START') return { remove: log.slice(i) };
+  if (WHISTLES.includes(target.type)) {
+    const without = log.filter((e) => e.id !== target.id);
+    const { state } = reduce(without, config, gameId);
+    if (state.status === 'running') {
+      return { remove: [], put: [{ ...target, type: 'CLOCK_PAUSE' } as GameEvent] };
+    }
+  }
+  return { remove: [target] };
 }
 
 function GoalSheet({

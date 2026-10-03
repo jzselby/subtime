@@ -184,7 +184,7 @@ export function Pitch({
             data-slot={slot.id}
             className={`token${occupant ? '' : ' vacant'}${isSelected ? ' picked' : ''}${
               dragging === slot.id ? ' dragging' : ''
-            }${dropSlotId === slot.id ? ' drop' : ''}${slot.y < 0.2 ? ' hi' : ''}`}
+            }${dropSlotId === slot.id ? ' drop' : ''}${slot.y < 0.2 || slot.y > 0.8 ? ' side' : ''}`}
             style={{ left: `${slot.x * 100}%`, top: `${slot.y * 100}%` }}
             onPointerDown={onPointerDown(slot, occupant)}
             onPointerMove={onPointerMove(slot)}

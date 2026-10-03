@@ -21,7 +21,16 @@ export function GameView({
   const stats = playerStats(state, now).filter((s) => state.attendance.get(s.playerId) !== 'absent');
   const byMinutes = [...stats].sort((a, b) => b.playedMs - a.playedMs);
   // Each bar carries the player's fair share, as in the app's own summary.
-  const fair = new Map(fairnessRows(state, now).map((r) => [r.playerId, r]));
+  // Of the time actually played, once the game is over — see the app's Summary.
+  const scheduledMs = state.config.periods.count * state.config.periods.lengthMs;
+  const playedScale =
+    state.status === 'final' && scheduledMs > 0 ? elapsedGameMs(state, now) / scheduledMs : 1;
+  const fair = new Map(
+    fairnessRows(state, now).map((r) => {
+      const targetMs = r.targetMs * playedScale;
+      return [r.playerId, { targetMs, deficitMs: targetMs - r.projectedMs }];
+    }),
+  );
   const isShort = (id: string) => {
     const r = fair.get(id);
     return !!r && r.targetMs > 0 && r.deficitMs > r.targetMs * 0.1;

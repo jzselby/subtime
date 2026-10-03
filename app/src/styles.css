@@ -1045,9 +1045,10 @@ body.sheet-open .actions {
   color: #2a1c02;
 }
 
-/* The front line has no headroom above its shirts — on a small phone the
-   badge ran into the pitch's top edge — so there it sits beside the shirt. */
-.token.hi .tstint {
+/* Beside the shirt rather than above it at both ends of the pitch: the front
+   line has no headroom (the badge hit the pitch's top edge on a small phone),
+   and above the keeper it sat on top of the centre-back's minutes. */
+.token.side .tstint {
   bottom: auto;
   top: 0;
   left: calc(50% + min(23px, 7.5cqh) + 3px);
