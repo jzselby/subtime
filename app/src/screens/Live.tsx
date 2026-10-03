@@ -200,14 +200,11 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     // stint's own duration.
     const rotationMs = currentRotationMs(state, playerId, now);
     /*
-     * Only where it says something the clock doesn't. Anyone on since the
-     * period began has a shift time equal to the game clock, so a full
-     * starting lineup showed seven copies of the same number. Shown again —
-     * amber — once someone passes the shift length, since the longest-on are
-     * exactly who a coach is looking for.
+     * On every shirt, always — even when it matches the game clock, since
+     * "on the whole game" is itself what a coach needs to see. Amber once
+     * past the shift length: the longest-on are who they're looking for.
      */
     const longShift = rotationMs !== null && rotationMs >= shiftMs;
-    const showShift = rotationMs !== null && (clock - rotationMs >= 1000 || longShift);
     occupants.set(slot.id, {
       playerId,
       name: p?.name ?? playerId,
@@ -215,9 +212,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       number: p?.number ?? '',
       playedMs: stats.get(playerId)?.playedMs ?? 0,
       ...(deficitOf.has(playerId) ? { deficitMs: deficitOf.get(playerId) as number } : {}),
-      ...(showShift && rotationMs !== null
-        ? { currentRotationMs: rotationMs, shiftLong: longShift }
-        : {}),
+      ...(rotationMs !== null ? { currentRotationMs: rotationMs, shiftLong: longShift } : {}),
     });
   }
   const freeCodes = formation.slots.filter((s) => !occupants.has(s.id)).map((s) => s.code);
