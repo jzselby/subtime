@@ -26,6 +26,8 @@ export interface Occupant {
   currentRotationMs?: number;
   /** Past the shift length — the badge turns amber. */
   shiftLong?: boolean;
+  /** Captain of this game — a small "C" on the shirt. */
+  captain?: boolean;
 }
 
 /**
@@ -207,6 +209,7 @@ export function Pitch({
               }
             >
               {occupant ? occupant.number || initials(occupant.name) : '+'}
+              {occupant?.captain && <span className="tcap">C</span>}
             </span>
             {occupant ? (
               <span className="tname">{occupant.shortName ?? occupant.name}</span>

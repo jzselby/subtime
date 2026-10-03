@@ -79,6 +79,8 @@ export interface Game {
   createdAt: number;
   /** Optional; unset for anything logged before this existed. */
   tag?: GameTag;
+  /** Who captained this game. Not indexed, so no schema bump. */
+  captainIds?: string[];
 }
 
 /**

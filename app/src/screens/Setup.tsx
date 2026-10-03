@@ -1,6 +1,7 @@
 import type { PlayerSlot } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CaptainsSheet } from '../captains';
 import { initials, minutesOf, Screen, Sheet, shortNames } from '../components';
 import { db, deleteGame, GAME_TAG_LABELS, type Game, type GameTag, type Player } from '../db';
 import { useGameLog } from '../hooks';
@@ -34,6 +35,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
   const [picking, setPicking] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const [attendance, setAttendance] = useState(false);
+  const [captainsOpen, setCaptainsOpen] = useState(false);
 
   const { state, recordMany, loading } = useGameLog(gameId, game?.config ?? DEFAULT_CFG);
 
@@ -182,6 +184,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
   const needed = Math.min(formation.slots.length, present.length);
   const byId = new Map(roster.map((p) => [p.id, p]));
   const short = shortNames(roster);
+  const captains = new Set(game.captainIds ?? []);
 
   const occupants = new Map<string, Occupant>();
   for (const [slotId, playerId] of Object.entries(lineup)) {
@@ -193,6 +196,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         shortName: short.get(p.id),
         number: p.number,
         playedMs: 0,
+        captain: captains.has(p.id),
       });
     }
   }
@@ -275,9 +279,14 @@ export function SetupScreen({ gameId }: { gameId: string }) {
 
       <div className="row spread" style={{ marginTop: 2 }}>
         <h2 style={{ margin: 0 }}>Bench · {present.length - filled}</h2>
-        <button className="btn ghost small" onClick={() => setAttendance(true)}>
-          {present.length} of {roster.length} here ›
-        </button>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="btn ghost small" onClick={() => setCaptainsOpen(true)}>
+            {captains.size ? `Captains · ${captains.size}` : 'Captains'}
+          </button>
+          <button className="btn ghost small" onClick={() => setAttendance(true)}>
+            {present.length} of {roster.length} here ›
+          </button>
+        </div>
       </div>
       <div className="setupbench" data-bench>
         {present
@@ -288,7 +297,10 @@ export function SetupScreen({ gameId }: { gameId: string }) {
               className="bplayer"
               onPointerDown={startDrag(p.id, 'bench', p.number || initials(p.name))}
             >
-              <span className="shirt">{p.number || initials(p.name)}</span>
+              <span className="shirt">
+                {p.number || initials(p.name)}
+                {captains.has(p.id) && <span className="tcap">C</span>}
+              </span>
               <span className="tname">{short.get(p.id) ?? p.name}</span>
             </button>
           ))}
@@ -301,6 +313,10 @@ export function SetupScreen({ gameId }: { gameId: string }) {
         <div className="dragavatar" style={{ left: ghost.x, top: ghost.y }}>
           {ghost.label}
         </div>
+      )}
+
+      {captainsOpen && (
+        <CaptainsSheet game={game} players={present} onClose={() => setCaptainsOpen(false)} />
       )}
 
       {attendance && (

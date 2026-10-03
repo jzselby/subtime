@@ -8,6 +8,7 @@ import { describeEvent } from '../describe';
 import { useGameLog, useNow } from '../hooks';
 import { navigate } from '../router';
 import { EditSheet } from './Events';
+import { CaptainsSheet, captainsLine } from '../captains';
 
 const DEFAULT_CFG = {
   periods: { count: 2, lengthMs: 1_800_000, fieldPlayers: 9 },
@@ -72,6 +73,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   const [share, setShare] = useState(false);
   const [editingGame, setEditingGame] = useState(false);
   const [editingGoal, setEditingGoal] = useState<GameEvent | null>(null);
+  const [captainsOpen, setCaptainsOpen] = useState(false);
 
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
@@ -145,6 +147,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
     const lines = [
       `${team.name} ${state.score.us}–${state.score.them} ${game.opponent || 'Opponent'}`,
       new Date(game.kickoffAt).toLocaleDateString(),
+      ...(captainsLine(game, nameOf) ? [captainsLine(game, nameOf) as string] : []),
       '',
       'Playing time:',
       ...byMinutes.map((s) => `  ${nameOf(s.playerId)} — ${mmss(s.playedMs)}`),
@@ -194,6 +197,9 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
       csvRow(['Date', new Date(game.kickoffAt).toLocaleDateString()]),
       csvRow(['Final score', `${team.name} ${state.score.us} – ${game.opponent || 'Opponent'} ${state.score.them}`]),
       csvRow(['Playing-time fairness', `${Math.round(index * 100)}%`]),
+      ...((game.captainIds ?? []).length
+        ? [csvRow(['Captains', (game.captainIds ?? []).map(nameOf).join('; ')])]
+        : []),
       '',
       csvRow([
         'Player', 'Number', 'Minutes', 'Bench Minutes', 'Positions Played',
@@ -288,6 +294,7 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
       year: 'numeric',
     }),
   )}</p>
+  ${captainsLine(game, nameOf) ? `<p class="meta">${escapeHtml(captainsLine(game, nameOf))}</p>` : ''}
   <div class="fair">Playing-time fairness: ${Math.round(index * 100)}%</div>
   <table>
     <thead>
@@ -466,6 +473,15 @@ ${rows}
             >
               Edit game
             </button>
+            <button
+              className="btn block"
+              onClick={() => {
+                setMenu(false);
+                setCaptainsOpen(true);
+              }}
+            >
+              Captains ›
+            </button>
             <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
               Modify events
             </button>
@@ -500,6 +516,23 @@ ${rows}
         The least-played available player got {Math.round(index * 100)}% of the
         most-played player's minutes.
       </div>
+
+      <button className="prow" onClick={() => setCaptainsOpen(true)}>
+        <span className="grow">
+          <span className="name">{captainsLine(game, nameOf) ?? 'No captains noted'}</span>
+        </span>
+        <span className="muted">{(game.captainIds ?? []).length ? 'Change ›' : 'Add ›'}</span>
+      </button>
+
+      {captainsOpen && (
+        <CaptainsSheet
+          game={game}
+          players={roster.filter(
+            (p) => p.active !== 0 && state.attendance.get(p.id) !== 'absent',
+          )}
+          onClose={() => setCaptainsOpen(false)}
+        />
+      )}
 
       {state.goals.length > 0 && (
         <>

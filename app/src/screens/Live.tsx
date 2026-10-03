@@ -15,6 +15,7 @@ import {
   shortNames,
   useToast,
 } from '../components';
+import { CaptainsSheet } from '../captains';
 import { db, deleteGame } from '../db';
 import { describeEvent } from '../describe';
 import { codesOf } from '../formations';
@@ -64,7 +65,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const [view, setView] = useState<'field' | 'list'>('field');
   const [pickedOff, setPickedOff] = useState<Set<string>>(new Set());
   const [pickedOn, setPickedOn] = useState<Set<string>>(new Set());
-  const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | null>(null);
+  const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | 'captains' | null>(null);
   const [movingPlayer, setMovingPlayer] = useState<string | null>(null);
   const [fillingSlot, setFillingSlot] = useState<string | null>(null);
 
@@ -189,6 +190,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
    * is exactly why `buildFormation` goes to the trouble of de-duplicating them.
    */
   const slotByCode = new Map(formation.slots.map((s) => [s.code, s]));
+  const captainIds = new Set(game?.captainIds ?? []);
   const occupants = new Map<string, Occupant>();
   for (const [playerId, code] of state.onField) {
     const slot = slotByCode.get(code);
@@ -213,6 +215,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       playedMs: stats.get(playerId)?.playedMs ?? 0,
       ...(deficitOf.has(playerId) ? { deficitMs: deficitOf.get(playerId) as number } : {}),
       ...(rotationMs !== null ? { currentRotationMs: rotationMs, shiftLong: longShift } : {}),
+      captain: captainIds.has(playerId),
     });
   }
   const freeCodes = formation.slots.filter((s) => !occupants.has(s.id)).map((s) => s.code);
@@ -598,6 +601,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 >
                   <span className="shirt" style={{ borderColor: heatColor(row.deficitMs) }}>
                     {p?.number || (p ? initials(p.name) : '?')}
+                    {captainIds.has(row.playerId) && <span className="tcap">C</span>}
                   </span>
                   <span className="tname">{shortName(row.playerId)}</span>
                   <span className="ttime">{mmss(stats.get(row.playerId)?.playedMs ?? 0)}</span>
@@ -754,6 +758,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             </button>
             {/* Stats and playing time moved to the header — a Stats button
                 sits next to ••• now, so this menu doesn't offer it twice. */}
+            <button className="btn block" onClick={() => setSheet('captains')}>
+              Captains{captainIds.size ? ` · ${[...captainIds].map(shortName).join(', ')}` : ''} ›
+            </button>
             <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
               Modify events
             </button>
@@ -800,6 +807,16 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             {benchRows.length === 0 && <p className="muted">Nobody is on the bench.</p>}
           </div>
         </Sheet>
+      )}
+
+      {sheet === 'captains' && (
+        <CaptainsSheet
+          game={game}
+          players={(players ?? []).filter(
+            (p) => p.active !== 0 && state.attendance.get(p.id) !== 'absent',
+          )}
+          onClose={() => setSheet(null)}
+        />
       )}
 
       {sheet === 'goal' && (

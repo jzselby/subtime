@@ -38,7 +38,12 @@ export function SeasonScreen({ teamId }: { teamId: string }) {
         );
       }),
     );
-    return { rows: aggregatePlayerStats(perGame), gameCount: started.length };
+    // Captaincies per player, so rotating the armband fairly is easy to check.
+    const captained = new Map<string, number>();
+    for (const game of started) {
+      for (const id of game.captainIds ?? []) captained.set(id, (captained.get(id) ?? 0) + 1);
+    }
+    return { rows: aggregatePlayerStats(perGame), gameCount: started.length, captained };
   }, [teamId]);
 
   const nameOf = useMemo(() => {
@@ -71,6 +76,7 @@ export function SeasonScreen({ teamId }: { teamId: string }) {
                 <th>Min</th>
                 <th>G</th>
                 <th>A</th>
+                <th>Capt</th>
                 <th>Positions</th>
               </tr>
             </thead>
@@ -87,6 +93,7 @@ export function SeasonScreen({ teamId }: { teamId: string }) {
                   <td>{mins(r.playedMs)}</td>
                   <td>{r.goals || ''}</td>
                   <td>{r.assists || ''}</td>
+                  <td>{season.captained.get(r.playerId) || ''}</td>
                   <td style={{ textAlign: 'left' }}>{byPosition(r.msByPosition) || '—'}</td>
                 </tr>
               ))}

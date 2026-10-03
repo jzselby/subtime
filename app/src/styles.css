@@ -1761,3 +1761,27 @@ button.banner {
   font-weight: 600;
   margin-bottom: 12px;
 }
+
+/* Captain's armband: a small gold "C" on the shirt's upper-left edge — clear
+   of the shift badge, which sits above or to the right. */
+.token .shirt,
+.bplayer .shirt {
+  position: relative;
+}
+
+.tcap {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #f5c400;
+  border: 1.5px solid #1a1400;
+  color: #1a1400;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
