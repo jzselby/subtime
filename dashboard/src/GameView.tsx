@@ -1,4 +1,4 @@
-import { elapsedGameMs, playerStats } from '@pitchside/core';
+import { elapsedGameMs, fairness as fairnessRows, playerStats } from '@pitchside/core';
 import { byPositionClock, mmss } from './format';
 import { periodOffsets, stintDurationMs, stintEndMs, type GameSummary } from './games';
 import type { DashboardPlayer } from './types';
@@ -20,7 +20,16 @@ export function GameView({
 
   const stats = playerStats(state, now).filter((s) => state.attendance.get(s.playerId) !== 'absent');
   const byMinutes = [...stats].sort((a, b) => b.playedMs - a.playedMs);
-  const maxMs = Math.max(1, ...byMinutes.map((s) => s.playedMs));
+  // Each bar carries the player's fair share, as in the app's own summary.
+  const fair = new Map(fairnessRows(state, now).map((r) => [r.playerId, r]));
+  const isShort = (id: string) => {
+    const r = fair.get(id);
+    return !!r && r.targetMs > 0 && r.deficitMs > r.targetMs * 0.1;
+  };
+  const maxMs = Math.max(
+    1,
+    ...byMinutes.map((s) => Math.max(s.playedMs, fair.get(s.playerId)?.targetMs ?? 0)),
+  );
   const scorers = stats
     .filter((s) => s.goals > 0 || s.assists > 0)
     .sort((a, b) => b.goals - a.goals || b.assists - a.assists);
@@ -101,13 +110,25 @@ export function GameView({
                         )}
                       </td>
                       <td className="bar" style={{ width: '52%' }}>
-                        <span style={{ width: `${(s.playedMs / maxMs) * 100}%` }} />
-                        <em>{mmss(s.playedMs)}</em>
+                        <span
+                          className={isShort(s.playerId) ? 'under' : undefined}
+                          style={{ width: `${(s.playedMs / maxMs) * 100}%` }}
+                        />
+                        {(fair.get(s.playerId)?.targetMs ?? 0) > 0 && (
+                          <i
+                            className="target"
+                            style={{ left: `${((fair.get(s.playerId)?.targetMs ?? 0) / maxMs) * 100}%` }}
+                          />
+                        )}
                       </td>
+                      <td className="barval">{mmss(s.playedMs)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <p className="small muted" style={{ margin: '8px 0 0' }}>
+                The line is each player’s fair share. Amber: more than 10% short of it.
+              </p>
             </div>
           )}
         </div>

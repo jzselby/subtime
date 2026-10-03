@@ -88,7 +88,7 @@ check(
 // And back to the bench.
 await dragTo(
   await page.locator('.token:not(.vacant)').boundingBox(),
-  await page.locator('.benchstrip').boundingBox(),
+  await page.locator('.setupbench').boundingBox(),
 );
 check('setup: dragging to the bench unassigns', await page.locator('.token:not(.vacant)').count(), 0);
 

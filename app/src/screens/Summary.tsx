@@ -1,10 +1,13 @@
-import { elapsedGameMs, fairnessIndex, formatClock, playerStats } from '@pitchside/core';
+import type { GameEvent } from '@pitchside/core';
+import { elapsedGameMs, fairness, fairnessIndex, formatClock, playerStats } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
-import { HoldButton, mins, mmss, Screen, Sheet } from '../components';
+import { HoldButton, mins, mmss, periodTag, Screen, Sheet } from '../components';
 import { db, deleteGame, GAME_TAG_LABELS, type Game, type GameTag } from '../db';
+import { describeEvent } from '../describe';
 import { useGameLog, useNow } from '../hooks';
 import { navigate } from '../router';
+import { EditSheet } from './Events';
 
 const DEFAULT_CFG = {
   periods: { count: 2, lengthMs: 1_800_000, fieldPlayers: 9 },
@@ -62,17 +65,30 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   );
 
   const config = game?.config ?? DEFAULT_CFG;
-  const { state, errors, record } = useGameLog(gameId, config);
+  const { state, errors, events, record } = useGameLog(gameId, config);
   const now = useNow(state.status === 'running');
   const [copied, setCopied] = useState(false);
   const [menu, setMenu] = useState(false);
   const [share, setShare] = useState(false);
   const [editingGame, setEditingGame] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<GameEvent | null>(null);
 
   const nameOf = useMemo(() => {
     const map = new Map((players ?? []).map((p) => [p.id, p]));
     return (id: string) => map.get(id)?.name ?? id;
   }, [players]);
+  const playerOf = useMemo(() => {
+    const map = new Map((players ?? []).map((p) => [p.id, p]));
+    return (id: string) => map.get(id);
+  }, [players]);
+  const roster = useMemo(
+    () =>
+      [...(players ?? [])].sort(
+        (a, b) =>
+          (Number(a.number) || 999) - (Number(b.number) || 999) || a.name.localeCompare(b.name),
+      ),
+    [players],
+  );
 
   const stats = useMemo(
     () => playerStats(state, now).filter((s) => state.attendance.get(s.playerId) !== 'absent'),
@@ -90,7 +106,21 @@ export function SummaryScreen({ gameId }: { gameId: string }) {
   if (!game || !team) return <Screen title="Loading…">{null}</Screen>;
 
   const elapsed = elapsedGameMs(state, now);
-  const maxMs = Math.max(1, ...stats.map((s) => s.playedMs));
+  /*
+   * Each bar gets its player's fair share drawn on it (DESIGN.md §7) — the
+   * question a playing-time bar exists to answer is "did they get enough",
+   * and a bare length couldn't say. Amber means more than 10% short of it by
+   * the final whistle (projected, while a game is still going) — relative, so
+   * routine sub timing in a long game doesn't paint half the team amber.
+   */
+  const fairRows = new Map(fairness(state, now).map((r) => [r.playerId, r]));
+  const isShort = (r?: { targetMs: number; deficitMs: number }) =>
+    !!r && r.targetMs > 0 && r.deficitMs > r.targetMs * 0.1;
+  const maxMs = Math.max(
+    1,
+    ...stats.map((s) => Math.max(s.playedMs, fairRows.get(s.playerId)?.targetMs ?? 0)),
+  );
+  const eventById = new Map(events.map((e) => [e.id, e]));
   const index = fairnessIndex(state, now);
   const byMinutes = [...stats].sort((a, b) => b.playedMs - a.playedMs);
 
@@ -461,6 +491,48 @@ ${rows}
         most-played player's minutes.
       </div>
 
+      {state.goals.length > 0 && (
+        <>
+          <h2>Goals</h2>
+          <div className="plist">
+            {state.goals.map((g) => {
+              const ev = eventById.get(g.eventId);
+              if (!ev) return null;
+              return (
+                <button key={g.eventId} className="prow evrow" onClick={() => setEditingGoal(ev)}>
+                  <span className="evtime">
+                    {periodTag(config.periods.count, g.period)} {formatClock(g.clockMs)}
+                  </span>
+                  <span className="grow">
+                    <span className="name">{describeEvent(ev, playerOf)}</span>
+                  </span>
+                  <span className="muted">›</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="small muted">Tap a goal to change who scored or assisted, or remove it.</p>
+        </>
+      )}
+
+      {editingGoal && (
+        <EditSheet
+          event={editingGoal}
+          roster={roster}
+          nameOf={playerOf}
+          onClose={() => setEditingGoal(null)}
+          onSave={async (patch) => {
+            await db.events.update(editingGoal.id, patch);
+            setEditingGoal(null);
+          }}
+          onDelete={async () => {
+            if (!confirm('Remove this goal? The score will change.')) return;
+            await db.events.delete(editingGoal.id);
+            setEditingGoal(null);
+          }}
+        />
+      )}
+
       <h2>Playing time</h2>
       <div className="card">
         <table className="tbl">
@@ -476,13 +548,25 @@ ${rows}
                   )}
                 </td>
                 <td className="bar" style={{ width: '52%' }}>
-                  <span style={{ width: `${(s.playedMs / maxMs) * 100}%` }} />
-                  <em>{mmss(s.playedMs)}</em>
+                  <span
+                    className={isShort(fairRows.get(s.playerId)) ? 'under' : undefined}
+                    style={{ width: `${(s.playedMs / maxMs) * 100}%` }}
+                  />
+                  {(fairRows.get(s.playerId)?.targetMs ?? 0) > 0 && (
+                    <i
+                      className="target"
+                      style={{ left: `${((fairRows.get(s.playerId)?.targetMs ?? 0) / maxMs) * 100}%` }}
+                    />
+                  )}
                 </td>
+                <td className="barval">{mmss(s.playedMs)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        <p className="small muted" style={{ marginTop: 8 }}>
+          The line is each player’s fair share. Amber: more than 10% short of it.
+        </p>
       </div>
 
       {state.stints.length > 0 && (

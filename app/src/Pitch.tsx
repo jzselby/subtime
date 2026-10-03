@@ -24,6 +24,8 @@ export interface Occupant {
    *  Undefined where there's no game running to measure it against (setup,
    *  the formation editor). */
   currentRotationMs?: number;
+  /** Past the shift length — the badge turns amber. */
+  shiftLong?: boolean;
 }
 
 /**
@@ -192,7 +194,9 @@ export function Pitch({
             }
           >
             {occupant && !compact && occupant.currentRotationMs !== undefined && (
-              <span className="tstint">{mmss(occupant.currentRotationMs)}</span>
+              <span className={`tstint${occupant.shiftLong ? ' long' : ''}`}>
+                {mmss(occupant.currentRotationMs)}
+              </span>
             )}
             <span
               className="shirt"

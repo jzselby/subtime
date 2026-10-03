@@ -279,7 +279,7 @@ export function SetupScreen({ gameId }: { gameId: string }) {
           {present.length} of {roster.length} here ›
         </button>
       </div>
-      <div className="benchstrip" data-bench>
+      <div className="setupbench" data-bench>
         {present
           .filter((p) => !assigned.has(p.id))
           .map((p) => (

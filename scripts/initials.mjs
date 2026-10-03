@@ -65,7 +65,7 @@ await page.click('.sheet >> text=Done');
 await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
 
 // -- setup screen: bench shirts, before anyone is placed ---------------------
-const shirts = await page.locator('.benchstrip .bplayer .shirt').allInnerTexts();
+const shirts = await page.locator('.setupbench .bplayer .shirt').allInnerTexts();
 console.log('setup bench shirts:', shirts);
 check('a numbered player still shows the number', shirts.includes('9'), true);
 check('a two-word name with no number shows real initials', shirts.includes('LS'), true);

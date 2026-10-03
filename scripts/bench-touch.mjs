@@ -1,6 +1,10 @@
 /**
  * Real touch input on the bench, not mouse simulation.
  *
+ * Since the UI review, the setup bench wraps like the live one instead of
+ * scrolling sideways, so the history below is the reason the scroll-vs-drag
+ * guard exists, not a description of today's layout.
+ *
  * Reported: "I can't scroll sideways through players to see the whole team.
  * It just selects a player to place." The setup screen's bench is a
  * horizontally scrolling strip, and `.bplayer` carries `touch-action: none`
@@ -101,19 +105,18 @@ await page.waitForSelector("text=Who's here?");
 await page.click('.sheet >> text=Done');
 await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
 
-// -- setup screen: a horizontal swipe scrolls the strip ---------------------
-const strip = page.locator('.benchstrip');
-check('the bench overflows on a 5-a-side squad of 14', await strip.evaluate((el) => el.scrollWidth > el.clientWidth), true);
-const box = await strip.boundingBox();
-await touchGesture(box.x + box.width - 20, box.y + box.height / 2, box.x + 20, box.y + box.height / 2);
-await page.waitForTimeout(200);
-check('a horizontal swipe over a bench shirt scrolls the strip', await strip.evaluate((el) => el.scrollLeft > 0), true);
-await strip.evaluate((el) => { el.scrollLeft = 0; });
-await page.waitForTimeout(100);
+// -- setup screen: the bench wraps, so nobody is hidden off to the side ----
+const strip = page.locator('.setupbench');
+check('the setup bench never scrolls sideways', await strip.evaluate((el) => el.scrollWidth <= el.clientWidth), true);
+check(
+  'every bench shirt is within the screen width',
+  await strip.evaluate((el) => [...el.querySelectorAll('.bplayer')].every((b) => b.getBoundingClientRect().right <= innerWidth)),
+  true,
+);
 
 // -- setup screen: a diagonal drag toward an off-centre slot still places --
-const benchName = await page.locator('.benchstrip .bplayer .tname >> nth=0').innerText();
-const benchBox = await page.locator('.benchstrip .bplayer >> nth=0').boundingBox();
+const benchName = await page.locator('.setupbench .bplayer .tname >> nth=0').innerText();
+const benchBox = await page.locator('.setupbench .bplayer >> nth=0').boundingBox();
 const target = await rightmostBox(page.locator('.token'));
 await touchGesture(
   benchBox.x + benchBox.width / 2, benchBox.y + benchBox.height / 2,

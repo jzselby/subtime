@@ -718,9 +718,28 @@ body.sheet-open .actions {
   opacity: 0.55;
 }
 
-.bar em {
-  position: relative;
-  font-style: normal;
+.bar span.under {
+  background: var(--warn);
+}
+
+/* Fair-share marker. */
+.bar .target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  opacity: 0.75;
+  border-radius: 1px;
+}
+
+/* The minutes, in their own cell rather than printed over the bar's end. */
+.barval {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .banner {
@@ -1020,6 +1039,12 @@ body.sheet-open .actions {
   white-space: nowrap;
 }
 
+/* Past the shift length: the longest-on are who a coach is looking for. */
+.token .tstint.long {
+  background: var(--warn);
+  color: #2a1c02;
+}
+
 /* The front line has no headroom above its shirts — on a small phone the
    badge ran into the pitch's top edge — so there it sits beside the shirt. */
 .token.hi .tstint {
@@ -1040,19 +1065,6 @@ body.sheet-open .actions {
 }
 
 /* Bench strip under the pitch: horizontally scrolling shirts. */
-.benchstrip {
-  flex: none;
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  padding: 4px 2px;
-  scrollbar-width: none;
-}
-
-.benchstrip::-webkit-scrollbar {
-  display: none;
-}
 
 .bplayer {
   flex: none;
@@ -1328,8 +1340,10 @@ body.sheet-open .actions {
 }
 
 /* Bench as a wrapping grid of shirts rather than a single scrolling row, so a
-   full squad is visible at once. */
-.benchgrid {
+   full squad is visible at once — on Setup too, where a sideways strip showed
+   five of thirteen players on a small phone with nothing hinting at the rest. */
+.benchgrid,
+.setupbench {
   flex: none;
   display: flex;
   flex-wrap: wrap;
@@ -1340,6 +1354,10 @@ body.sheet-open .actions {
   max-height: 27vh;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.setupbench {
+  padding: 4px 0;
 }
 
 .subbar {

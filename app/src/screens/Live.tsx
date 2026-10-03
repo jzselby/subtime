@@ -199,6 +199,15 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     // currentRotationMs's own doc for why that's not the same as the open
     // stint's own duration.
     const rotationMs = currentRotationMs(state, playerId, now);
+    /*
+     * Only where it says something the clock doesn't. Anyone on since the
+     * period began has a shift time equal to the game clock, so a full
+     * starting lineup showed seven copies of the same number. Shown again —
+     * amber — once someone passes the shift length, since the longest-on are
+     * exactly who a coach is looking for.
+     */
+    const longShift = rotationMs !== null && rotationMs >= shiftMs;
+    const showShift = rotationMs !== null && (clock - rotationMs >= 1000 || longShift);
     occupants.set(slot.id, {
       playerId,
       name: p?.name ?? playerId,
@@ -206,7 +215,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       number: p?.number ?? '',
       playedMs: stats.get(playerId)?.playedMs ?? 0,
       ...(deficitOf.has(playerId) ? { deficitMs: deficitOf.get(playerId) as number } : {}),
-      ...(rotationMs !== null ? { currentRotationMs: rotationMs } : {}),
+      ...(showShift && rotationMs !== null
+        ? { currentRotationMs: rotationMs, shiftLong: longShift }
+        : {}),
     });
   }
   const freeCodes = formation.slots.filter((s) => !occupants.has(s.id)).map((s) => s.code);
@@ -743,18 +754,17 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             <button className="btn block" onClick={() => navigate({ name: 'events', gameId })}>
               Modify events
             </button>
-            <button
+            {/* The bottom of this sheet is the easiest spot to hit with a
+                thumb mid-game, and a confirm() is dismissed by the same
+                reflexive tap that opened it. A hold can't be a mis-tap. */}
+            <HoldButton
               className="btn danger block"
-              onClick={() => {
-                if (confirm(`Delete this game and everything recorded in it?`)) {
-                  void deleteGame(gameId).then(() =>
-                    navigate({ name: 'team', teamId: game.teamId }),
-                  );
-                }
+              onHold={() => {
+                void deleteGame(gameId).then(() => navigate({ name: 'team', teamId: game.teamId }));
               }}
             >
-              Delete game
-            </button>
+              Hold to delete this game
+            </HoldButton>
           </div>
         </Sheet>
       )}

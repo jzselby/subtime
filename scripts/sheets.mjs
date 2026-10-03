@@ -130,7 +130,7 @@ check(
   'Delete game takes its own click',
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('.sheet button')].find((b) =>
-      b.textContent?.includes('Delete game'),
+      /delete (this )?game/i.test(b.textContent ?? ''),
     );
     if (!btn) return 'missing';
     const r = btn.getBoundingClientRect();

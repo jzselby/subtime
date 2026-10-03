@@ -331,7 +331,7 @@ const toSeconds = (text) => {
   const [m, s] = text.trim().split(':').map(Number);
   return (m ?? 0) * 60 + (s ?? 0);
 };
-const played = await page.locator('.bar em').allInnerTexts();
+const played = await page.locator('.barval').allInnerTexts();
 const summed = played.reduce((acc, t) => acc + toSeconds(t), 0);
 const elapsed = toSeconds((await page.locator('.top .sub').innerText()).match(/\d+:\d+/)?.[0] ?? '0:0');
 // Every reading is floored to the second, so allow a second per player.

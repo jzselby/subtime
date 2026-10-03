@@ -135,7 +135,7 @@ export function EventsScreen({ gameId }: { gameId: string }) {
   );
 }
 
-function EditSheet({
+export function EditSheet({
   event,
   roster,
   nameOf,
