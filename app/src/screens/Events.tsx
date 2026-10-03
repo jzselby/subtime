@@ -1,9 +1,9 @@
 import type { GameEvent } from '@pitchside/core';
-import { formatClock } from '@pitchside/core';
+import { canRetime, formatClock } from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 import { periodTag, Screen, Sheet } from '../components';
-import { db } from '../db';
+import { db, retimeInDb } from '../db';
 import { describeEvent, isEditable } from '../describe';
 import { useGameLog } from '../hooks';
 import { navigate } from '../router';
@@ -129,6 +129,8 @@ export function EventsScreen({ gameId }: { gameId: string }) {
             await db.events.delete(editing.id);
             setEditing(null);
           }}
+          onRetime={(ms) => retimeInDb(gameId, editing.id, ms, config)}
+          when={`${periodTag(config.periods.count, editing.period)} ${formatClock(editing.gameClockMs)}`}
         />
       )}
     </Screen>
@@ -142,6 +144,8 @@ export function EditSheet({
   onClose,
   onSave,
   onDelete,
+  onRetime,
+  when,
 }: {
   event: GameEvent;
   roster: { id: string; name: string; number: string }[];
@@ -149,8 +153,75 @@ export function EditSheet({
   onClose: () => void;
   onSave: (patch: Record<string, unknown>) => Promise<void>;
   onDelete: () => Promise<void>;
+  /** Move the event to a new clock time; resolves to a reason if refused. */
+  onRetime?: (clockMs: number) => Promise<string | null>;
+  /** "1H 14:10" — where the event currently sits. */
+  when?: string;
 }) {
-  const [pick, setPick] = useState<'scorer' | 'assist' | 'player' | null>(null);
+  const [pick, setPick] = useState<'scorer' | 'assist' | 'player' | 'time' | null>(null);
+  const [mins, setMins] = useState(String(Math.floor(event.gameClockMs / 60_000)));
+  const [secs, setSecs] = useState(
+    String(Math.floor((event.gameClockMs % 60_000) / 1000)).padStart(2, '0'),
+  );
+  const [timeError, setTimeError] = useState<string | null>(null);
+  const retimable = !!onRetime && canRetime(event);
+
+  if (pick === 'time' && onRetime) {
+    const save = async () => {
+      const ms = (Number(mins) || 0) * 60_000 + Math.min(59, Number(secs) || 0) * 1000;
+      const refused = await onRetime(ms);
+      if (refused) setTimeError(refused);
+      else onClose();
+    };
+    return (
+      <Sheet title="When did it actually happen?" onClose={() => setPick(null)}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <p className="small muted">
+            Game clock, same half — now {when}. Minutes, the timeline and fairness all
+            recalculate from the new time.
+          </p>
+          <div className="row">
+            <label className="field grow">
+              <span>Minutes</span>
+              <input
+                autoFocus
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={mins}
+                onChange={(e) => {
+                  setMins(e.target.value);
+                  setTimeError(null);
+                }}
+              />
+            </label>
+            <label className="field grow">
+              <span>Seconds</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={59}
+                value={secs}
+                onChange={(e) => {
+                  setSecs(e.target.value);
+                  setTimeError(null);
+                }}
+              />
+            </label>
+          </div>
+          {timeError && (
+            <p className="small" style={{ color: 'var(--danger)', margin: 0 }}>
+              {timeError}
+            </p>
+          )}
+          <button className="btn primary block" onClick={() => void save()}>
+            Save time
+          </button>
+        </div>
+      </Sheet>
+    );
+  }
 
   const chips = (selected: string | null, onPick: (id: string | null) => void) => (
     <div className="chips">
@@ -194,6 +265,12 @@ export function EditSheet({
   return (
     <Sheet title={describeEvent(event, nameOf)} onClose={onClose}>
       <div style={{ display: 'grid', gap: 8 }}>
+        {retimable && (
+          <button className="btn block" onClick={() => setPick('time')}>
+            Change time — {when} ›
+          </button>
+        )}
+
         {event.type === 'GOAL' && (
           <>
             <button className="btn block" onClick={() => setPick('scorer')}>
@@ -225,7 +302,7 @@ export function EditSheet({
           </>
         )}
 
-        {!isEditable(event) && (
+        {!isEditable(event) && !retimable && (
           <p className="small muted">
             There is nothing to correct on this one — remove it and record it again if
             it is wrong.

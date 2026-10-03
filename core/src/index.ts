@@ -20,6 +20,8 @@ export {
 export { appendEvent, newEventId } from './append.js';
 export type { EventInput } from './append.js';
 export { appearsInLog, playerIdsIn } from './players.js';
+export { canRetime, retimeEvent } from './retime.js';
+export type { RetimeResult } from './retime.js';
 export {
   aggregatePlayerStats,
   availablePlayers,

@@ -1,5 +1,5 @@
 import type { EventInput, GameConfig, GameEvent } from '@pitchside/core';
-import { appearsInLog, appendEvent, defaultConfig, reduce } from '@pitchside/core';
+import { appearsInLog, appendEvent, defaultConfig, reduce, retimeEvent } from '@pitchside/core';
 import Dexie, { type EntityTable } from 'dexie';
 import type { Formation } from './formations';
 import { defaultFormation } from './formations';
@@ -356,6 +356,27 @@ export async function logPastGame(
     await db.events.bulkAdd(batch);
   });
   return id;
+}
+
+/**
+ * Move one recorded event to a different time in its own period — see
+ * `retimeEvent` in core. Read and written in one transaction so it acts on the
+ * log as stored, not on whatever a screen last rendered. Resolves to null on
+ * success, or the reason the new time was refused.
+ */
+export async function retimeInDb(
+  gameId: string,
+  eventId: string,
+  newClockMs: number,
+  config: GameConfig,
+): Promise<string | null> {
+  return db.transaction('rw', db.events, async () => {
+    const log = await db.events.where('gameId').equals(gameId).toArray();
+    const result = retimeEvent(log, eventId, newClockMs, config, gameId);
+    if (!result.ok) return result.reason;
+    await db.events.bulkPut(result.changed);
+    return null;
+  });
 }
 
 export async function deleteGame(gameId: string): Promise<void> {

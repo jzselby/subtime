@@ -3,7 +3,7 @@ import { elapsedGameMs, fairness, fairnessIndex, formatClock, playerStats } from
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo, useState } from 'react';
 import { HoldButton, mins, mmss, periodTag, Screen, Sheet } from '../components';
-import { db, deleteGame, GAME_TAG_LABELS, type Game, type GameTag } from '../db';
+import { db, deleteGame, GAME_TAG_LABELS, retimeInDb, type Game, type GameTag } from '../db';
 import { describeEvent } from '../describe';
 import { useGameLog, useNow } from '../hooks';
 import { navigate } from '../router';
@@ -573,6 +573,8 @@ ${rows}
             await db.events.delete(editingGoal.id);
             setEditingGoal(null);
           }}
+          onRetime={(ms) => retimeInDb(gameId, editingGoal.id, ms, config)}
+          when={`${periodTag(config.periods.count, editingGoal.period)} ${formatClock(editingGoal.gameClockMs)}`}
         />
       )}
 
@@ -610,6 +612,13 @@ ${rows}
         <p className="small muted" style={{ marginTop: 8 }}>
           The line is each player’s fair share. Amber: more than 10% short of it.
         </p>
+        <button
+          className="btn ghost small"
+          style={{ marginTop: 4, paddingLeft: 0 }}
+          onClick={() => navigate({ name: 'events', gameId })}
+        >
+          Minutes wrong? Fix when a sub happened ›
+        </button>
       </div>
 
       {state.stints.length > 0 && (
