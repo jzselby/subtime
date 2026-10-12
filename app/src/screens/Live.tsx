@@ -1,5 +1,13 @@
-import type { GameConfig, GameEvent, PlayerSlot } from '@pitchside/core';
-import { clockAt, currentRotationMs, fairness, formatClock, playerStats, reduce } from '@pitchside/core';
+import type { GameConfig, GameEvent, GameState, PlayerSlot } from '@pitchside/core';
+import {
+  clockAt,
+  currentRotationMs,
+  fairness,
+  formatClock,
+  playerStats,
+  reduce,
+  suggestSubsOff,
+} from '@pitchside/core';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -16,7 +24,7 @@ import {
   useToast,
 } from '../components';
 import { CaptainsSheet } from '../captains';
-import { db, deleteGame } from '../db';
+import { db, deleteGame, type Player } from '../db';
 import { describeEvent } from '../describe';
 import { codesOf } from '../formations';
 import type { EventInput, UndoPlan } from '../hooks';
@@ -56,7 +64,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   );
 
   const config = game?.config ?? DEFAULT_CFG;
-  const { state, errors, events, record, recordMany, undo } = useGameLog(gameId, config);
+  const { state, errors, events, loading, record, recordMany, undo } = useGameLog(gameId, config);
 
   const running = state.status === 'running';
   const now = useNow(running);
@@ -65,7 +73,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const [view, setView] = useState<'field' | 'list'>('field');
   const [pickedOff, setPickedOff] = useState<Set<string>>(new Set());
   const [pickedOn, setPickedOn] = useState<Set<string>>(new Set());
-  const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | 'captains' | null>(null);
+  const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | 'captains' | 'here' | null>(null);
   const [movingPlayer, setMovingPlayer] = useState<string | null>(null);
   const [fillingSlot, setFillingSlot] = useState<string | null>(null);
 
@@ -93,7 +101,29 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   );
 
   const onFieldRows = rows.filter((r) => r.onField);
-  const benchRows = rows.filter((r) => !r.onField);
+  // A player who went off hurt keeps their row in the fairness table (their
+  // minutes still count) but isn't on the bench to be picked.
+  const benchRows = rows.filter((r) => !r.onField && r.available);
+
+  /*
+   * One recording action at a time, and none within half a second of the
+   * last. A double-tap on a confirm button used to record the goal or sub
+   * twice — the second copy of a sub then failing and leaving a red banner —
+   * and a tap meant for a button that has just closed could land on whatever
+   * replaced it (the sub bar becomes the Pause button). A third of a second is
+   * shorter than any two real, separate decisions on the sideline.
+   */
+  const lastAct = useRef(0);
+  const inFlight = useRef(false);
+  const act = (fn: () => Promise<unknown>) => {
+    const t = Date.now();
+    if (inFlight.current || t - lastAct.current < 350) return;
+    lastAct.current = t;
+    inFlight.current = true;
+    void fn().finally(() => {
+      inFlight.current = false;
+    });
+  };
   const clock = clockAt(state, now);
 
   /*
@@ -136,6 +166,10 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const { notify, toast } = useToast();
   const seen = useRef(-1);
   useEffect(() => {
+    // Still loading reads as an empty log; counting from that made the real
+    // log look brand new, and the last event replayed (and beeped) every time
+    // the screen was opened.
+    if (loading) return;
     const count = events.length;
     const before = seen.current;
     seen.current = count;
@@ -165,7 +199,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       'PERIOD_END',
     ];
     if (!silent.includes(e.type)) confirmCue();
-  }, [events, nameOf, notify]);
+  }, [events, loading, nameOf, notify]);
 
   const shiftMs = Math.max(60_000, Math.round(config.periods.lengthMs / 4));
   const shiftDue = running && clock - lastSubClock >= shiftMs;
@@ -238,6 +272,21 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     setPickedOn(new Set());
   };
 
+  /*
+   * The suggested change, as pairs: the most-owed on the bench for whoever on
+   * the field is furthest over their share (never the keeper). Only pairs
+   * that actually even things up — no suggestion beats a pointless one.
+   */
+  const deficitById = new Map(rows.map((r) => [r.playerId, r.deficitMs]));
+  const suggestedOff = suggestSubsOff(state, now, Math.min(2, benchRows.length));
+  const suggestions = suggestedOff
+    .map((offId, i) => ({ onId: benchRows[i]?.playerId, offId }))
+    .filter(
+      (p): p is { onId: string; offId: string } =>
+        !!p.onId &&
+        (deficitById.get(p.onId) ?? 0) - (deficitById.get(p.offId) ?? 0) > 30_000,
+    );
+
   const toggle = (set: Set<string>, id: string, apply: (s: Set<string>) => void) => {
     if (dragged.current) return;
     const next = new Set(set);
@@ -257,16 +306,18 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       const slot = formation.slots.find((s) => s.id === target.slotId);
       if (!slot) return;
       const sitting = occupants.get(target.slotId);
-      void record({
-        type: 'SUB',
-        off: sitting ? [sitting.playerId] : [],
-        on: [{ playerId, position: slot.code }],
-      });
+      act(() =>
+        record({
+          type: 'SUB',
+          off: sitting ? [sitting.playerId] : [],
+          on: [{ playerId, position: slot.code }],
+        }),
+      );
       return;
     }
 
     if (target.onBench) {
-      void record({ type: 'SUB', off: [playerId], on: [] });
+      act(() => record({ type: 'SUB', off: [playerId], on: [] }));
       return;
     }
     if (!target.slotId || target.slotId === from) return;
@@ -280,9 +331,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         { type: 'POSITION_CHANGE', playerId, to: slot.code },
         { type: 'POSITION_CHANGE', playerId: sitting.playerId, to: fromSlot.code },
       ];
-      void recordMany(swap);
+      act(() => recordMany(swap));
     } else {
-      void record({ type: 'POSITION_CHANGE', playerId, to: slot.code });
+      act(() => record({ type: 'POSITION_CHANGE', playerId, to: slot.code }));
     }
   };
 
@@ -301,8 +352,10 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     if (dragged.current) return;
     if (pickedOff.size === 1) {
       const playerId = [...pickedOff][0] as string;
-      void record({ type: 'POSITION_CHANGE', playerId, to: slotCode }).then(() =>
-        setPickedOff(new Set()),
+      act(() =>
+        record({ type: 'POSITION_CHANGE', playerId, to: slotCode }).then(() =>
+          setPickedOff(new Set()),
+        ),
       );
       return;
     }
@@ -334,10 +387,10 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const overrun = overrunMs > 0;
 
   const transport = () => {
-    if (state.status === 'running') void record({ type: 'CLOCK_PAUSE' });
-    else if (state.status === 'paused') void record({ type: 'CLOCK_RESUME' });
+    if (state.status === 'running') act(() => record({ type: 'CLOCK_PAUSE' }));
+    else if (state.status === 'paused') act(() => record({ type: 'CLOCK_RESUME' }));
     else if (state.status === 'pregame' || state.status === 'break')
-      void record({ type: 'PERIOD_START' });
+      act(() => record({ type: 'PERIOD_START' }));
   };
 
   const transportLabel =
@@ -355,7 +408,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const undoLast = () => {
     const what = undoTargetOriginal ? describeEvent(undoTargetOriginal, nameOf) : '';
     const reopened = !!plan.put?.length;
-    void undo((log) => undoPlan(log, config, gameId)).then(() => {
+    act(() => undo((log) => undoPlan(log, config, gameId)).then(() => {
       if (reopened) {
         notify('Reopened — clock stopped. Start it when play restarts.');
         confirmCue();
@@ -363,7 +416,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       }
       notify(what ? `Undid — ${what}` : 'Undone');
       confirmCue();
-    });
+    }));
   };
 
   /*
@@ -491,10 +544,18 @@ export function LiveScreen({ gameId }: { gameId: string }) {
       </header>
 
       {errors.length > 0 && (
-        <div className="banner error" style={{ margin: '8px 12px 0' }}>
-          {errors.length} event{errors.length === 1 ? '' : 's'} could not be applied.{' '}
-          {errors[errors.length - 1]?.reason}
-        </div>
+        <button
+          className="banner error"
+          style={{ margin: '8px 12px 0', textAlign: 'left' }}
+          onClick={() => navigate({ name: 'events', gameId })}
+        >
+          {errors.length} event{errors.length === 1 ? '' : 's'} could not be applied:{' '}
+          {(errors[errors.length - 1]?.reason ?? '').replace(
+            /player (\S+)/g,
+            (_m, id: string) => nameOf(id)?.name ?? 'a player',
+          )}
+          . Fix ›
+        </button>
       )}
 
       {view === 'field' ? (
@@ -575,11 +636,46 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         says who. Always present during play (not only when due), so the pitch
         doesn't jump in size the moment the alarm goes off.
       */}
-      {showNextUp && (
-        <div className={`nextup${shiftDue ? ' due' : ''}`}>
-          {shiftDue ? 'Shift due' : 'Next on'} · {nextUp.join(', ')}
-        </div>
-      )}
+      {/*
+        Each suggested pair is a button: a tap selects both players, and the
+        sub bar below then reads "Max on for Mia" to confirm — so a fair change
+        is two taps without working out who should come off.
+      */}
+      {showNextUp &&
+        (suggestions.length > 0 ? (
+          <div className={`nextup pairs${shiftDue ? ' due' : ''}`}>
+            <span>{shiftDue ? 'Shift due' : 'Next'}</span>
+            {suggestions.map(({ onId, offId }) => {
+              const on = pickedOn.has(onId) && pickedOff.has(offId);
+              return (
+                <button
+                  key={onId}
+                  className={`nextpair${on ? ' sel' : ''}`}
+                  onClick={() => {
+                    setPickedOn((prev) => {
+                      const next = new Set(prev);
+                      if (on) next.delete(onId);
+                      else next.add(onId);
+                      return next;
+                    });
+                    setPickedOff((prev) => {
+                      const next = new Set(prev);
+                      if (on) next.delete(offId);
+                      else next.add(offId);
+                      return next;
+                    });
+                  }}
+                >
+                  {shortName(onId)} for {shortName(offId)}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className={`nextup${shiftDue ? ' due' : ''}`}>
+            {shiftDue ? 'Shift due' : 'Next on'} · {nextUp.join(', ')}
+          </div>
+        ))}
 
       {view === 'field' && (
         <div className="benchgrid" data-bench>
@@ -628,7 +724,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             </button>
             <button
               className={`btn grow${wrongCount ? ' warn' : ' primary'}`}
-              onClick={() => void makeSub()}
+              onClick={() => act(makeSub)}
             >
               {subLabel}
             </button>
@@ -687,7 +783,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             </button>
             <button
               className="btn"
-              onClick={() => void record({ type: 'OPPONENT_GOAL' })}
+              onClick={() => act(() => record({ type: 'OPPONENT_GOAL' }))}
               disabled={state.period === 0 || !canPlay}
             >
               ⚽ Them
@@ -758,6 +854,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             </button>
             {/* Stats and playing time moved to the header — a Stats button
                 sits next to ••• now, so this menu doesn't offer it twice. */}
+            <button className="btn block" onClick={() => setSheet('here')}>
+              Who's here — late arrival or injury ›
+            </button>
             <button className="btn block" onClick={() => setSheet('captains')}>
               Captains{captainIds.size ? ` · ${[...captainIds].map(shortName).join(', ')}` : ''} ›
             </button>
@@ -792,13 +891,15 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                 <button
                   key={row.playerId}
                   className="chip"
-                  onClick={() => {
-                    void record({
-                      type: 'SUB',
-                      off: [],
-                      on: [{ playerId: row.playerId, position: code }],
-                    }).then(() => setFillingSlot(null));
-                  }}
+                  onClick={() =>
+                    act(() =>
+                      record({
+                        type: 'SUB',
+                        off: [],
+                        on: [{ playerId: row.playerId, position: code }],
+                      }).then(() => setFillingSlot(null)),
+                    )
+                  }
                 >
                   {p?.number && <b>{p.number}</b>} {p?.name ?? row.playerId}
                 </button>
@@ -819,6 +920,15 @@ export function LiveScreen({ gameId }: { gameId: string }) {
         />
       )}
 
+      {sheet === 'here' && (
+        <HereSheet
+          players={(players ?? []).filter((p) => p.active !== 0)}
+          state={state}
+          onClose={() => setSheet(null)}
+          onRecord={(inputs) => act(() => recordMany(inputs))}
+        />
+      )}
+
       {sheet === 'goal' && (
         <GoalSheet
           onField={[...state.onField.keys()]}
@@ -828,7 +938,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             // Closed only once the write lands, not the instant it's fired —
             // a closed sheet reads as "done," and that's exactly the moment
             // a coach might background the tab.
-            void record({ type: 'GOAL', scorerId, assistId }).then(() => setSheet(null));
+            act(() => record({ type: 'GOAL', scorerId, assistId }).then(() => setSheet(null)));
           }}
         />
       )}
@@ -870,14 +980,15 @@ export function LiveScreen({ gameId }: { gameId: string }) {
                     ([id, code]) => code === position && id !== movingPlayer,
                   )?.[0];
                   const mine = state.onField.get(movingPlayer);
-                  const written =
-                    sitting && mine
+                  act(() =>
+                    (sitting && mine
                       ? recordMany([
                           { type: 'POSITION_CHANGE', playerId: movingPlayer, to: position },
                           { type: 'POSITION_CHANGE', playerId: sitting, to: mine },
                         ])
-                      : record({ type: 'POSITION_CHANGE', playerId: movingPlayer, to: position });
-                  void written.then(() => setMovingPlayer(null));
+                      : record({ type: 'POSITION_CHANGE', playerId: movingPlayer, to: position })
+                    ).then(() => setMovingPlayer(null)),
+                  );
                 }}
               >
                 {position}
@@ -937,6 +1048,16 @@ function GoalSheet({
   onSubmit: (scorerId: string | null, assistId: string | null) => void;
 }) {
   const [scorer, setScorer] = useState<string | null>(null);
+  /*
+   * The assist chips appear exactly where the scorer chips just were, so the
+   * second half of a double-tap on the scorer used to land on a teammate and
+   * record them as the assist. Taps in the first moment after are ignored.
+   */
+  const pickedAt = useRef(0);
+  const submit = (assistId: string | null) => {
+    if (Date.now() - pickedAt.current < 350) return;
+    onSubmit(scorer, assistId);
+  };
 
   // Two taps, both from the on-field set only — nobody wants to scroll a full
   // roster while the team is still celebrating.
@@ -945,7 +1066,14 @@ function GoalSheet({
       <Sheet title="Who scored?" onClose={onClose}>
         <div className="chips">
           {onField.map((id) => (
-            <button key={id} className="chip" onClick={() => setScorer(id)}>
+            <button
+              key={id}
+              className="chip"
+              onClick={() => {
+                pickedAt.current = Date.now();
+                setScorer(id);
+              }}
+            >
               {nameOf(id)?.number && <b>{nameOf(id)?.number}</b>} {nameOf(id)?.name ?? id}
             </button>
           ))}
@@ -964,11 +1092,11 @@ function GoalSheet({
         {onField
           .filter((id) => id !== scorer)
           .map((id) => (
-            <button key={id} className="chip" onClick={() => onSubmit(scorer, id)}>
+            <button key={id} className="chip" onClick={() => submit(id)}>
               {nameOf(id)?.number && <b>{nameOf(id)?.number}</b>} {nameOf(id)?.name ?? id}
             </button>
           ))}
-        <button className="chip sel" onClick={() => onSubmit(scorer, null)}>
+        <button className="chip sel" onClick={() => submit(null)}>
           No assist
         </button>
       </div>
@@ -976,3 +1104,87 @@ function GoalSheet({
   );
 }
 
+
+/**
+ * Who's here, mid-game: a late arrival joins the bench, a player who goes off
+ * hurt leaves it. Both are attendance events, so fairness follows: the late
+ * arrival is owed a share of only the game that was left, and the injured
+ * player keeps the minutes they played without being counted short — or
+ * suggested to go back on — for the rest.
+ */
+function HereSheet({
+  players,
+  state,
+  onClose,
+  onRecord,
+}: {
+  players: Player[];
+  state: GameState;
+  onClose: () => void;
+  onRecord: (inputs: EventInput[]) => void;
+}) {
+  const statusOf = (id: string) => state.attendance.get(id);
+  const sorted = [...players].sort((a, b) => a.name.localeCompare(b.name));
+  const here = sorted.filter((p) => {
+    const st = statusOf(p.id);
+    return st === 'present' || st === 'late' || state.onField.has(p.id);
+  });
+  const hurt = sorted.filter((p) => statusOf(p.id) === 'injured' && !state.onField.has(p.id));
+  const away = sorted.filter((p) => !here.includes(p) && !hurt.includes(p));
+
+  const row = (p: Player, note: string, action: string, inputs: EventInput[], cls = 'btn') => (
+    <div key={p.id} className="prow herow">
+      <span className="name">
+        {p.number && <b>{p.number} </b>}
+        {p.name}
+        <small className="muted"> · {note}</small>
+      </span>
+      <button className={cls} onClick={() => onRecord(inputs)}>
+        {action}
+      </button>
+    </div>
+  );
+
+  return (
+    <Sheet title="Who's here" onClose={onClose}>
+      {away.length > 0 && (
+        <>
+          <h2>Not here yet</h2>
+          <div className="plist">
+            {away.map((p) =>
+              row(p, 'not here', 'Arrived', [{ type: 'ATTENDANCE', playerId: p.id, status: 'late' }], 'btn primary'),
+            )}
+          </div>
+        </>
+      )}
+      {hurt.length > 0 && (
+        <>
+          <h2>Out hurt</h2>
+          <div className="plist">
+            {hurt.map((p) =>
+              row(p, 'out', 'Back in', [{ type: 'ATTENDANCE', playerId: p.id, status: 'present' }]),
+            )}
+          </div>
+        </>
+      )}
+      <h2>Here · {here.length}</h2>
+      <p className="small muted">
+        “Hurt / left” takes a player out of the rotation for the rest of the game. On the
+        field, it also takes them off — fill the gap from the bench.
+      </p>
+      <div className="plist">
+        {here.map((p) => {
+          const on = state.onField.has(p.id);
+          const out: EventInput[] = [
+            ...(on ? [{ type: 'SUB', off: [p.id], on: [] } as EventInput] : []),
+            { type: 'ATTENDANCE', playerId: p.id, status: 'injured' },
+          ];
+          return row(p, on ? 'on the field' : 'bench', 'Hurt / left', out);
+        })}
+      </div>
+      <button className="btn block" style={{ marginTop: 14 }} onClick={onClose}>
+        Done
+      </button>
+    </Sheet>
+  );
+}

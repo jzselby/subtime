@@ -236,8 +236,9 @@ await page.waitForTimeout(150);
 // -- goals -----------------------------------------------------------------
 await page.click('text=⚽ Us');
 await page.click('.sheet .chip >> nth=0');
+await page.waitForTimeout(400);
 await page.click('.sheet .chip >> nth=0');
-await page.waitForTimeout(300);
+await page.waitForTimeout(400);
 await page.click('text=⚽ Them');
 await page.waitForTimeout(300);
 // The score sits beside the clock, on its own — larger than the meta line

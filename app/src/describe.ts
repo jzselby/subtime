@@ -31,7 +31,13 @@ export function describeEvent(
     case 'SET_LINEUP':
       return `Lineup set (${e.slots.length} players)`;
     case 'ATTENDANCE':
-      return `${nm(e.playerId)}: ${e.status}`;
+      return e.status === 'late'
+        ? `${nm(e.playerId)} arrived`
+        : e.status === 'injured'
+          ? `${nm(e.playerId)} out (hurt)`
+          : e.status === 'absent'
+            ? `${nm(e.playerId)}: not here`
+            : `${nm(e.playerId)}: here`;
     case 'CARD':
       return `${e.card} card: ${nm(e.playerId)}`;
     case 'SHOT':

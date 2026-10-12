@@ -327,14 +327,48 @@ export interface FairnessRow {
    * than show one that would otherwise read as a false all-clear.
    */
   excludedGk: boolean;
+  /** Can go on now — false for a player who left hurt. Kept in the table so
+   *  the minutes they did play still count, but never suggested. */
+  available: boolean;
 }
 
+/** Players who can be put on right now — here, and not out hurt. */
 export function availablePlayers(state: GameState): PlayerId[] {
   const out: PlayerId[] = [];
   for (const [playerId, status] of state.attendance) {
     if (status === 'present' || status === 'late') out.push(playerId);
   }
   return out.sort();
+}
+
+/**
+ * Each player's share of the game they were actually there for, in [0, 1]:
+ * 1 for the whole game, 0.5 for a kid who arrived at half-time or went off
+ * hurt at it. Players with no attendance record count as there throughout.
+ */
+export function availabilityShares(state: GameState): Map<PlayerId, number> {
+  const total = state.config.periods.count * state.config.periods.lengthMs;
+  const out = new Map<PlayerId, number>();
+  if (total <= 0) return out;
+  for (const [playerId, spans] of state.availability) {
+    let ms = 0;
+    for (const span of spans) ms += Math.max(0, Math.min(span.to ?? total, total) - span.from);
+    out.set(playerId, Math.min(1, ms / total));
+  }
+  return out;
+}
+
+/**
+ * Who the game's minutes are shared between: everyone available now, plus
+ * anyone who was available for part of it (a player who left hurt still
+ * played the minutes they played). Falls back to whoever played when there's
+ * no register at all.
+ */
+function fairnessPool(state: GameState, shares: Map<PlayerId, number>): PlayerId[] {
+  const ids = new Set(availablePlayers(state));
+  for (const [playerId, share] of shares) if (share > 0) ids.add(playerId);
+  if (ids.size > 0) return [...ids].sort();
+  return [...new Set(state.stints.map((s) => s.playerId))].sort();
 }
 
 /**
@@ -366,8 +400,10 @@ export function fairness(
   const { count, lengthMs, fieldPlayers } = state.config.periods;
   const remaining = remainingInGameMs(state, nowWallTs);
 
-  const roster = availablePlayers(state);
-  const pool = roster.length > 0 ? roster : [...new Set(state.stints.map((s) => s.playerId))].sort();
+  const shares = availabilityShares(state);
+  const pool = fairnessPool(state, shares);
+  const availableNow = new Set(availablePlayers(state));
+  const hasRegister = state.attendance.size > 0;
 
   const gkExcluded = state.config.fairness.gkWeight === 0;
   const isExcludedGk = (playerId: PlayerId): boolean =>
@@ -377,7 +413,10 @@ export function fairness(
   const excludedSlots = pool.length - sharedPool.length;
   const totalFieldMs = count * lengthMs * Math.max(0, fieldPlayers - excludedSlots);
 
-  const weightOf = (playerId: PlayerId): number => weights?.get(playerId) ?? 1;
+  // A late arrival or an early exit is owed a share of only the game they
+  // were there for.
+  const weightOf = (playerId: PlayerId): number =>
+    (weights?.get(playerId) ?? 1) * (shares.get(playerId) ?? 1);
   const weightSum = sharedPool.reduce((acc, playerId) => acc + weightOf(playerId), 0);
 
   const stats = new Map(playerStats(state, nowWallTs).map((s) => [s.playerId, s]));
@@ -403,6 +442,7 @@ export function fairness(
       targetMs,
       deficitMs: excludedGk ? 0 : targetMs - projectedMs,
       excludedGk,
+      available: !hasRegister || availableNow.has(playerId),
     };
   });
 
@@ -415,7 +455,7 @@ export function fairness(
  */
 export function suggestSubsOn(state: GameState, nowWallTs: number, howMany: number): PlayerId[] {
   return fairness(state, nowWallTs)
-    .filter((r) => !r.onField)
+    .filter((r) => !r.onField && r.available)
     .slice(0, howMany)
     .map((r) => r.playerId);
 }
@@ -448,15 +488,19 @@ export function suggestSubsOff(state: GameState, nowWallTs: number, howMany: num
  * the score by making them the max everyone else is compared against.
  */
 export function fairnessIndex(state: GameState, nowWallTs: number): number {
-  const pool = availablePlayers(state);
+  const shares = availabilityShares(state);
+  const pool = fairnessPool(state, shares);
   const gkExcluded = state.config.fairness.gkWeight === 0;
   const stats = playerStats(state, nowWallTs).filter(
     (s) =>
       (pool.length === 0 || pool.includes(s.playerId)) &&
+      (shares.get(s.playerId) ?? 1) > 0 &&
       !(gkExcluded && state.onField.get(s.playerId) === state.config.gkPosition),
   );
   if (stats.length === 0) return 1;
-  const times = stats.map((s) => s.playedMs);
+  // Minutes per share of the game they were there for, so a half-time
+  // arrival who played every minute after doesn't read as the unfair one.
+  const times = stats.map((s) => s.playedMs / (shares.get(s.playerId) ?? 1));
   const max = Math.max(...times);
   const min = Math.min(...times);
   if (max === 0) return 1;

@@ -39,7 +39,10 @@ export class LogBuilder {
     return this;
   }
 
-  attendance(playerIds: string[], status: 'present' | 'absent' = 'present'): this {
+  attendance(
+    playerIds: string[],
+    status: 'present' | 'absent' | 'late' | 'injured' = 'present',
+  ): this {
     for (const playerId of playerIds) this.push({ type: 'ATTENDANCE', playerId, status });
     return this;
   }

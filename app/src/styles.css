@@ -499,7 +499,14 @@ label.field > span {
   font-variant-numeric: tabular-nums;
 }
 
+.prow .grow {
+  min-width: 0;
+}
+
+/* Block, not inline: an inline span never truncates, so a long name ran
+   under the position badge and the minutes. */
 .prow .name {
+  display: block;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -1403,6 +1410,58 @@ body.sheet-open .actions {
   background: var(--warn);
   border-top-color: var(--warn);
   color: #2a1c02;
+}
+
+/* Suggested swaps: each pair a tappable chip, the label beside them. */
+.nextup.pairs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+
+.nextpair {
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nextup.due .nextpair {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(42, 28, 2, 0.35);
+  color: #2a1c02;
+}
+
+.nextpair.sel {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #04210f;
+}
+
+.herow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.herow .name {
+  flex: 1;
+  min-width: 0;
+}
+
+.herow .btn {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 12px;
 }
 
 /* --------------------------------------------------------- drag to sub -- */

@@ -25,6 +25,7 @@ export type { RetimeResult } from './retime.js';
 export {
   aggregatePlayerStats,
   availablePlayers,
+  availabilityShares,
   currentRotationMs,
   fairness,
   fairnessIndex,

@@ -72,6 +72,7 @@ const playAGame = async (opponent) => {
   await page.waitForSelector('text=Who scored?');
   const scorer = (await page.locator('.sheet .chip >> nth=0').innerText()).trim();
   await page.click('.sheet .chip >> nth=0');
+  await page.waitForTimeout(400);
   await page.click('.sheet >> text=No assist');
   await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
   return scorer;

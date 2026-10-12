@@ -46,6 +46,14 @@ export interface GameStateShape {
   anchor: { wallTs: number; clockMs: number } | null;
   onField: Map<PlayerId, PositionCode>;
   attendance: Map<PlayerId, AttendanceStatus>;
+  /**
+   * When each player was actually available, as spans of *scheduled* game time
+   * (period 2 at 5:00 of 25-minute halves is 30:00). Here from kickoff unless
+   * they arrived late; a span closes when they leave hurt. Fairness uses it so
+   * a kid who arrived at half-time is owed half a game, not a whole one, and
+   * one who went off injured isn't counted short for the minutes they missed.
+   */
+  availability: Map<PlayerId, { from: number; to: number | null }[]>;
   /** Includes still-open stints, which carry `endMs: null`. */
   stints: Stint[];
   goals: GoalRecord[];
@@ -74,6 +82,7 @@ export function initialState(gameId: string, config: GameConfig): GameStateShape
     anchor: null,
     onField: new Map(),
     attendance: new Map(),
+    availability: new Map(),
     stints: [],
     goals: [],
     cards: [],
@@ -162,6 +171,21 @@ function applyEvent(s: GameStateShape, e: GameEvent): string | null {
   switch (e.type) {
     case 'ATTENDANCE': {
       s.attendance.set(e.playerId, e.status);
+      const here = e.status === 'present' || e.status === 'late';
+      // Before kickoff it's just the register being taken: here or not, for
+      // the whole game.
+      if (s.period === 0) {
+        if (here) s.availability.set(e.playerId, [{ from: 0, to: null }]);
+        else s.availability.delete(e.playerId);
+        break;
+      }
+      const L = s.config.periods.lengthMs;
+      const pos = (s.period - 1) * L + Math.min(at, L);
+      const spans = s.availability.get(e.playerId) ?? [];
+      const open = spans[spans.length - 1];
+      if (here && (!open || open.to !== null)) spans.push({ from: pos, to: null });
+      if (!here && open && open.to === null) open.to = Math.max(open.from, pos);
+      s.availability.set(e.playerId, spans);
       break;
     }
 

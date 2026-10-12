@@ -97,6 +97,7 @@ await page.waitForTimeout(1200);
 await page.click('text=⚽ Us');
 await page.waitForSelector('text=Who scored?');
 await page.click(`.sheet .chip:has-text("Alice Adams")`);
+await page.waitForTimeout(400);
 await page.click('.sheet >> text=No assist');
 await page.waitForSelector('.sheet-backdrop', { state: 'detached' });
 

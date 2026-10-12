@@ -71,6 +71,7 @@ await page.waitForTimeout(800);
 await page.click('text=⚽ Us');
 const scorer = (await page.locator('.sheet .chip >> nth=0').innerText()).replace(/^\d+\s*/, '').trim();
 await page.click('.sheet .chip >> nth=0');
+await page.waitForTimeout(400);
 await page.click('.sheet >> text=No assist');
 await page.waitForTimeout(300);
 
@@ -85,10 +86,10 @@ await page.click('[aria-label="More"]');
 await page.click('.sheet >> text=Modify events');
 await page.waitForSelector('text=Modify events');
 // Attendance is collapsed by default; everything that happened is not.
-check('attendance is collapsed', await page.locator('.prow:has-text("present")').count(), 0);
+check('attendance is collapsed', await page.locator('.prow:has-text(": here")').count(), 0);
 await page.click('text=/^Show attendance/');
 await page.waitForTimeout(150);
-check('attendance can be shown', (await page.locator('.prow:has-text("present")').count()) > 0, true);
+check('attendance can be shown', (await page.locator('.prow:has-text(": here")').count()) > 0, true);
 await page.click('text=/^Hide attendance/');
 await page.waitForTimeout(150);
 check('the game itself is listed', (await page.locator('.plist .prow').count()) >= 4, true);

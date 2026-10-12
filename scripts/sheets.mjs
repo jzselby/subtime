@@ -147,7 +147,7 @@ await page.waitForTimeout(300);
 await sheetIsClickable('goal');
 // Swapping one sheet for another must not leave the page marked closed.
 await page.click('.sheet .chip >> nth=0');
-await page.waitForTimeout(300);
+await page.waitForTimeout(400);
 check(
   'a sheet swap keeps the page marked open',
   await page.evaluate(
