@@ -60,7 +60,7 @@ create table games (
   config jsonb not null,
   formation jsonb not null,
   status text not null,
-  -- 'fall' | 'spring' | 'tournament' | 'scrimmage', or null for untagged.
+  -- 'fall' | 'spring' | 'indoor' | 'tournament' | 'scrimmage', or null for untagged.
   -- Not an enum: app/src/db.ts's GameTag is the source of truth for the
   -- fixed set, and a text column needs no migration if that set ever grows.
   tag text,

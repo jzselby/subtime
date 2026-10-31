@@ -35,6 +35,7 @@ function useGameId(): [string | null, (id: string | null) => void] {
 const TAG_LABELS: Record<string, string> = {
   fall: 'Fall season',
   spring: 'Spring season',
+  indoor: 'Indoor season',
   tournament: 'Tournament',
   scrimmage: 'Scrimmage',
 };

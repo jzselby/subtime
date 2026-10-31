@@ -56,13 +56,14 @@ export interface Player {
 }
 
 /** Fixed on purpose — see the dashboard's tag filter, which lists exactly these. */
-export type GameTag = 'fall' | 'spring' | 'tournament' | 'scrimmage';
+export type GameTag = 'fall' | 'spring' | 'indoor' | 'tournament' | 'scrimmage';
 
-/** Shared everywhere a game's tag is picked, so the four options and their
+/** Shared everywhere a game's tag is picked, so the options and their
  *  labels stay in exactly one place. */
 export const GAME_TAG_LABELS: Record<GameTag, string> = {
   fall: 'Fall season',
   spring: 'Spring season',
+  indoor: 'Indoor season',
   tournament: 'Tournament',
   scrimmage: 'Scrimmage',
 };
