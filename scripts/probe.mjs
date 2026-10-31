@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 const URL = 'http://localhost:4173';
 const SIZE = Number(process.argv[2] ?? 11);
 const W = Number(process.argv[3] ?? 375), H = Number(process.argv[4] ?? 667);
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
 const p = await ctx.newPage();
 p.on('dialog', (d) => d.accept());

@@ -14,7 +14,7 @@ const DEVICES = [
 const size = Number(process.argv[2] ?? 9);
 const only = process.argv[3];
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 
 for (const [tag, w, h] of DEVICES) {
   if (only && only !== tag) continue;

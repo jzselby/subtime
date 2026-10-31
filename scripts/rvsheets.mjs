@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 const OUT='/home/user/subtime/scripts/shots/rv';
-const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome'});
+const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium'});
 const ctx=await b.newContext({viewport:{width:375,height:667},deviceScaleFactor:2});
 const p=await ctx.newPage(); p.on('dialog',d=>d.accept());
 await p.goto('http://localhost:4173'); await p.waitForSelector('text=Pitchside');

@@ -11,7 +11,7 @@ const DEVICES = [
 // vertical room, so it has to be in here.
 const SIZES = [7, 9, 11];
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 let bad = 0;
 
 for (const [label, w, h] of DEVICES) {

@@ -11,7 +11,7 @@ const H = Number(process.argv[3] ?? 667);
 const SIZE = Number(process.argv[4] ?? 9);
 const tag = `m${W}-${SIZE}`;
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
 const ctx = await b.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
 const p = await ctx.newPage();
 p.on('pageerror', (e) => console.log('PAGE ERROR:', e.message));

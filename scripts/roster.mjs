@@ -26,7 +26,7 @@ const check = (label, actual, expected) => {
 };
 
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  executablePath: '/opt/pw-browsers/chromium',
   headless: !args.includes('--headed'),
 });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
