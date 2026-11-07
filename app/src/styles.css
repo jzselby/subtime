@@ -896,6 +896,18 @@ body.sheet-open .actions {
   aspect-ratio: 68 / 72;
 }
 
+/* The formation preview: small enough that the Use button stays on screen,
+   with first names kept — who goes where is the whole point of it. */
+.formpreview {
+  width: min(100%, 250px);
+  margin: 12px auto;
+  pointer-events: none;
+}
+
+.formpreview .token:not(.vacant) .tname {
+  display: block;
+}
+
 .pitch-lines {
   position: absolute;
   inset: 0;

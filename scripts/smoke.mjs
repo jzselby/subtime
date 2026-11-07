@@ -240,7 +240,8 @@ await page.waitForTimeout(400);
 await page.click('.sheet .chip >> nth=0');
 await page.waitForTimeout(400);
 await page.click('text=⚽ Them');
-await page.waitForTimeout(300);
+// Past the live screen's double-tap guard, so the Pause below registers.
+await page.waitForTimeout(400);
 // The score sits beside the clock, on its own — larger than the meta line
 // it used to share with the period label, and readable at a glance.
 check('score reads 1–1', (await page.locator('.gscore').innerText()).trim(), '1–1');

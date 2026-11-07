@@ -263,3 +263,66 @@ export function defaultFormation(fieldPlayers: number): Formation {
 
 /** Slot codes in formation order — the vocabulary for the position picker. */
 export const codesOf = (formation: Formation): string[] => formation.slots.map((s) => s.code);
+
+/**
+ * Where everyone stands after a change of shape mid-game: each player on the
+ * field goes to the slot in `to` nearest the one they hold in `from`, chosen
+ * together so the total move is as small as it can be. Depth counts double,
+ * so a defender stays at the back rather than drifting across to a nearer
+ * wide midfield slot, and the keeper only leaves goal if `to` has none.
+ *
+ * Exact, not greedy: at most eleven players, so trying every assignment by
+ * dynamic programming over the slots used is a few thousand steps.
+ *
+ * Returns player id → new slot code, for every player in `onField`.
+ */
+export function remapToFormation(
+  from: Formation,
+  to: Formation,
+  onField: ReadonlyMap<string, string>,
+): Map<string, string> {
+  const fromByCode = new Map(from.slots.map((s) => [s.code, s]));
+  const players = [...onField.keys()].sort();
+  const slots = to.slots;
+  const n = players.length;
+  const m = slots.length;
+  const out = new Map<string, string>();
+  if (n === 0 || m === 0) return out;
+
+  const cost = (p: string, slot: Slot): number => {
+    const at = fromByCode.get(onField.get(p) ?? '') ?? { x: 0.5, y: 0.5, role: 'M' as Role };
+    const dx = at.x - slot.x;
+    const dy = (at.y - slot.y) * 2;
+    const keeper = (at.role === 'GK') !== (slot.role === 'GK') ? 10 : 0;
+    return dx * dx + dy * dy + keeper;
+  };
+
+  // More players than slots can't happen in a real game; seat whoever fits.
+  const k = Math.min(n, m);
+  const best = new Map<number, number>([[0, 0]]);
+  const choice = new Map<string, number>(); // `${i}:${mask}` → slot index
+  for (let i = 0; i < k; i++) {
+    const next = new Map<number, number>();
+    for (const [mask, c] of best) {
+      for (let j = 0; j < m; j++) {
+        if (mask & (1 << j)) continue;
+        const nm = mask | (1 << j);
+        const nc = c + cost(players[i] as string, slots[j] as Slot);
+        if (nc < (next.get(nm) ?? Infinity)) {
+          next.set(nm, nc);
+          choice.set(`${i}:${nm}`, j);
+        }
+      }
+    }
+    best.clear();
+    for (const [mask, c] of next) best.set(mask, c);
+  }
+
+  let mask = [...best.entries()].reduce((a, b) => (b[1] < a[1] ? b : a))[0];
+  for (let i = k - 1; i >= 0; i--) {
+    const j = choice.get(`${i}:${mask}`) as number;
+    out.set(players[i] as string, (slots[j] as Slot).code);
+    mask &= ~(1 << j);
+  }
+  return out;
+}

@@ -26,7 +26,8 @@ import {
 import { CaptainsSheet } from '../captains';
 import { db, deleteGame, type Player } from '../db';
 import { describeEvent } from '../describe';
-import { codesOf } from '../formations';
+import type { Formation } from '../formations';
+import { codesOf, presetsFor, remapToFormation } from '../formations';
 import type { EventInput, UndoPlan } from '../hooks';
 import { useGameLog, useNow, useWakeLock } from '../hooks';
 import type { DropTarget } from '../usePitchDrag';
@@ -73,7 +74,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const [view, setView] = useState<'field' | 'list'>('field');
   const [pickedOff, setPickedOff] = useState<Set<string>>(new Set());
   const [pickedOn, setPickedOn] = useState<Set<string>>(new Set());
-  const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | 'captains' | 'here' | null>(null);
+  const [sheet, setSheet] = useState<'goal' | 'log' | 'menu' | 'captains' | 'here' | 'formation' | null>(null);
   const [movingPlayer, setMovingPlayer] = useState<string | null>(null);
   const [fillingSlot, setFillingSlot] = useState<string | null>(null);
 
@@ -165,6 +166,7 @@ export function LiveScreen({ gameId }: { gameId: string }) {
    */
   const { notify, toast } = useToast();
   const seen = useRef(-1);
+  const quietNext = useRef(false);
   useEffect(() => {
     // Still loading reads as an empty log; counting from that made the real
     // log look brand new, and the last event replayed (and beeped) every time
@@ -177,6 +179,12 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     if (before < 0 || count <= before) return;
     const e = events[count - 1];
     if (!e) return;
+    // A change of formation announces itself by name; its batch of moves
+    // would otherwise toast as just the last of them ("Sam → LM").
+    if (quietNext.current) {
+      quietNext.current = false;
+      return;
+    }
     /*
      * Not for a sub: its own visual feedback — the pitch token swapping
      * instantly — is plenty, and the toast sat over the bench for its full
@@ -226,8 +234,20 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const slotByCode = new Map(formation.slots.map((s) => [s.code, s]));
   const captainIds = new Set(game?.captainIds ?? []);
   const occupants = new Map<string, Occupant>();
-  for (const [playerId, code] of state.onField) {
+  /*
+   * A player whose position isn't in this formation — the log and the shape
+   * out of step, however that came about — still gets a shirt, in a free
+   * slot, rather than vanishing from the pitch while still counted as on.
+   */
+  const placed = new Set<string>();
+  const seat = [...state.onField].map(([playerId, code]) => {
     const slot = slotByCode.get(code);
+    if (slot) placed.add(slot.id);
+    return { playerId, slot };
+  });
+  const spareSlots = formation.slots.filter((s) => !placed.has(s.id));
+  for (const entry of seat) entry.slot ??= spareSlots.shift();
+  for (const { playerId, slot } of seat) {
     if (!slot) continue;
     const p = nameOf(playerId);
     // "Time in this shift" — since the player last came on, unaffected by a
@@ -405,7 +425,26 @@ export function LiveScreen({ gameId }: { gameId: string }) {
   const plan = undoPlan(events, config, gameId);
   const undoTarget = plan.remove[0] ?? plan.put?.[0];
   const undoTargetOriginal = undoTarget && events.find((e) => e.id === undoTarget.id);
+  /*
+   * A change of formation is one decision, so Undo takes it back as one: the
+   * moves and the shape together. Undoing only its last move would leave a
+   * player on a position the new shape doesn't have.
+   */
+  const fc = game.formationChange;
+  const formationUndo = !!fc && !!undoTargetOriginal && fc.eventIds.includes(undoTargetOriginal.id);
   const undoLast = () => {
+    if (fc && formationUndo) {
+      act(() =>
+        undo(
+          (log) => ({ remove: log.filter((e) => fc.eventIds.includes(e.id)) }),
+          () => db.games.update(gameId, { formation: fc.from, formationChange: undefined }),
+        ).then(() => {
+          notify(`Undid — back to ${fc.from.name}`);
+          confirmCue();
+        }),
+      );
+      return;
+    }
     const what = undoTargetOriginal ? describeEvent(undoTargetOriginal, nameOf) : '';
     const reopened = !!plan.put?.length;
     act(() => undo((log) => undoPlan(log, config, gameId)).then(() => {
@@ -438,9 +477,11 @@ export function LiveScreen({ gameId }: { gameId: string }) {
     CLOCK_PAUSE: 'pause',
     CLOCK_RESUME: 'resume',
   };
-  const undoLabel = undoTargetOriginal
-    ? `↩ Undo ${undoNoun[undoTargetOriginal.type] ?? undoTargetOriginal.type.toLowerCase()}`
-    : '↩ Undo';
+  const undoLabel = formationUndo
+    ? '↩ Undo formation'
+    : undoTargetOriginal
+      ? `↩ Undo ${undoNoun[undoTargetOriginal.type] ?? undoTargetOriginal.type.toLowerCase()}`
+      : '↩ Undo';
 
   /*
    * The sub button used to read "Sub 1 ↔ 0" in full primary green and, tapped,
@@ -854,6 +895,9 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             </button>
             {/* Stats and playing time moved to the header — a Stats button
                 sits next to ••• now, so this menu doesn't offer it twice. */}
+            <button className="btn block" onClick={() => setSheet('formation')}>
+              Change formation · {formation.name} ›
+            </button>
             <button className="btn block" onClick={() => setSheet('here')}>
               Who's here — late arrival or injury ›
             </button>
@@ -917,6 +961,47 @@ export function LiveScreen({ gameId }: { gameId: string }) {
             (p) => p.active !== 0 && state.attendance.get(p.id) !== 'absent',
           )}
           onClose={() => setSheet(null)}
+        />
+      )}
+
+      {sheet === 'formation' && (
+        <FormationSheet
+          current={formation}
+          extra={team.formation}
+          onField={state.onField}
+          occupantOf={(playerId) => {
+            const p = nameOf(playerId);
+            return {
+              playerId,
+              name: p?.name ?? playerId,
+              shortName: shortName(playerId),
+              number: p?.number ?? '',
+              playedMs: stats.get(playerId)?.playedMs ?? 0,
+            };
+          }}
+          onClose={() => setSheet(null)}
+          onApply={(to) => {
+            const moves = remapToFormation(formation, to, state.onField);
+            const inputs: EventInput[] = [...moves]
+              .filter(([playerId, code]) => state.onField.get(playerId) !== code)
+              .map(([playerId, code]) => ({ type: 'POSITION_CHANGE', playerId, to: code }));
+            const from = formation;
+            act(() => {
+              if (inputs.length) quietNext.current = true;
+              return recordMany(inputs, undefined, (batch) =>
+                db.games.update(gameId, {
+                  formation: to,
+                  formationChange: { from, eventIds: batch.map((e) => e.id) },
+                }),
+              ).then(() => {
+                setSheet(null);
+                setPickedOff(new Set());
+                setPickedOn(new Set());
+                notify(`Formation: ${to.name}`);
+                confirmCue();
+              });
+            });
+          }}
         />
       )}
 
@@ -1185,6 +1270,78 @@ function HereSheet({
       <button className="btn block" style={{ marginTop: 14 }} onClick={onClose}>
         Done
       </button>
+    </Sheet>
+  );
+}
+
+/**
+ * Pick a new shape mid-game. Tapping one shows the team in it — everyone moved
+ * to the nearest matching position — before anything is recorded, so the
+ * coach can see who ends up where. Same number a side only: changing how many
+ * play is a sub, not a formation.
+ */
+function FormationSheet({
+  current,
+  extra,
+  onField,
+  occupantOf,
+  onClose,
+  onApply,
+}: {
+  current: Formation;
+  /** The team's own default shape, offered if it isn't a preset. */
+  extra: Formation | undefined;
+  onField: ReadonlyMap<string, string>;
+  occupantOf: (playerId: string) => Occupant;
+  onClose: () => void;
+  onApply: (to: Formation) => void;
+}) {
+  const size = current.slots.length;
+  const options = presetsFor(size);
+  if (extra && extra.slots.length === size && !options.some((f) => f.name === extra.name)) {
+    options.unshift(extra);
+  }
+  const [picked, setPicked] = useState<Formation | null>(null);
+
+  const preview = new Map<string, Occupant>();
+  if (picked) {
+    const moves = remapToFormation(current, picked, onField);
+    const slotByCode = new Map(picked.slots.map((s) => [s.code, s.id]));
+    for (const [playerId, code] of moves) {
+      const slotId = slotByCode.get(code);
+      if (slotId) preview.set(slotId, occupantOf(playerId));
+    }
+  }
+
+  return (
+    <Sheet title="Change formation" onClose={onClose}>
+      <p className="small muted">
+        Now: {current.name}. Pick a shape to see where everyone goes — nothing changes until you
+        tap Use. Drag players afterwards to fine-tune.
+      </p>
+      <div className="chips" style={{ marginTop: 10 }}>
+        {options.map((f) => (
+          <button
+            key={f.name}
+            className={`chip${picked?.name === f.name ? ' sel' : ''}`}
+            disabled={f.name === current.name}
+            onClick={() => setPicked(f)}
+          >
+            {f.name}
+            {f.name === current.name ? ' · now' : ''}
+          </button>
+        ))}
+      </div>
+      {picked && (
+        <>
+          <div className="formpreview">
+            <Pitch formation={picked} occupants={preview} compact />
+          </div>
+          <button className="btn primary block" onClick={() => onApply(picked)}>
+            Use {picked.name}
+          </button>
+        </>
+      )}
     </Sheet>
   );
 }

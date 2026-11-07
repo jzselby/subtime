@@ -82,6 +82,12 @@ export interface Game {
   tag?: GameTag;
   /** Who captained this game. Not indexed, so no schema bump. */
   captainIds?: string[];
+  /**
+   * The most recent mid-game change of shape: the formation before it and the
+   * position moves it recorded, so Undo can take the whole change back as one
+   * (moves alone would put players on positions the new shape doesn't have).
+   */
+  formationChange?: { from: Formation; eventIds: string[] };
 }
 
 /**

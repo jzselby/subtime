@@ -77,10 +77,16 @@ export interface UseGameLog extends ReduceResult {
   loading: boolean;
   /** Stamp an input against current state, persist it, and re-fold. */
   record: (input: EventInput, wallTs?: number) => Promise<void>;
-  /** Append several events in one transaction, each folded onto the last. */
-  recordMany: (inputs: EventInput[], wallTs?: number) => Promise<void>;
+  /** Append several events in one transaction, each folded onto the last.
+   *  `alongside` runs inside the same transaction — for a change to the game
+   *  record that must land with the events (a new formation). */
+  recordMany: (
+    inputs: EventInput[],
+    wallTs?: number,
+    alongside?: (batch: GameEvent[]) => Promise<unknown>,
+  ) => Promise<void>;
   /** Drop the most recent event. The event log makes undo this cheap. */
-  undo: (pick?: (log: GameEvent[]) => UndoPlan) => Promise<void>;
+  undo: (pick?: (log: GameEvent[]) => UndoPlan, alongside?: () => Promise<unknown>) => Promise<void>;
 }
 
 /**
@@ -130,13 +136,17 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
   }, []);
 
   const recordMany = useCallback(
-    async (inputs: EventInput[], wallTs: number = Date.now()) => {
-      if (!gameId || inputs.length === 0) return;
+    async (
+      inputs: EventInput[],
+      wallTs: number = Date.now(),
+      alongside?: (batch: GameEvent[]) => Promise<unknown>,
+    ) => {
+      if (!gameId || (inputs.length === 0 && !alongside)) return;
       pendingWrites.current += 1;
       try {
         // Re-fold from storage inside the write so two rapid taps cannot both
         // stamp the same `seq`.
-        await db.transaction('rw', db.events, async () => {
+        await db.transaction('rw', db.events, db.games, async () => {
           const current = await db.events
             .where('[gameId+seq]')
             .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
@@ -148,7 +158,8 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
             const { state } = reduce([...current, ...batch], config, gameId);
             batch.push(appendEvent(state, input, wallTs));
           }
-          await db.events.bulkAdd(batch);
+          if (batch.length) await db.events.bulkAdd(batch);
+          if (alongside) await alongside(batch);
         });
       } finally {
         pendingWrites.current -= 1;
@@ -162,14 +173,14 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
     [recordMany],
   );
 
-  const undo = useCallback(async (pick?: (log: GameEvent[]) => UndoPlan) => {
+  const undo = useCallback(async (pick?: (log: GameEvent[]) => UndoPlan, alongside?: () => Promise<unknown>) => {
     if (!gameId) return;
     pendingWrites.current += 1;
     try {
       // Chosen from the log as stored at the moment of the write, not the
       // render the button was drawn from, so two quick taps take back two
       // different things rather than both aiming at the same one.
-      await db.transaction('rw', db.events, async () => {
+      await db.transaction('rw', db.events, db.games, async () => {
         const log = await db.events
           .where('[gameId+seq]')
           .between([gameId, Dexie_MIN], [gameId, Dexie_MAX])
@@ -177,6 +188,7 @@ export function useGameLog(gameId: string | undefined, config: GameConfig): UseG
         const plan: UndoPlan = pick ? pick(log) : { remove: log.slice(-1) };
         if (plan.remove.length) await db.events.bulkDelete(plan.remove.map((e) => e.id));
         if (plan.put?.length) await db.events.bulkPut(plan.put);
+        if (alongside) await alongside();
       });
     } finally {
       pendingWrites.current -= 1;
